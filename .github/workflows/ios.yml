@@ -1,0 +1,126 @@
+name: Build Joker Rogue iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: 4.3
+  GODOT_CHANNEL: stable
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Godot 4.3
+        run: |
+          set -e
+          curl -fL "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_CHANNEL}/Godot_v${GODOT_VERSION}-${GODOT_CHANNEL}_macos.universal.zip" -o "$RUNNER_TEMP/godot.zip"
+          mkdir -p "$RUNNER_TEMP/godot-bin"
+          unzip -o "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP/godot-bin"
+          GODOT_BIN="$(find "$RUNNER_TEMP/godot-bin" -type f -path '*/Contents/MacOS/Godot' -print -quit)"
+          if [ -z "$GODOT_BIN" ]; then
+            GODOT_BIN="$(find "$RUNNER_TEMP/godot-bin" -type f -name Godot -print -quit)"
+          fi
+          chmod +x "$GODOT_BIN"
+          echo "GODOT=$GODOT_BIN" >> "$GITHUB_ENV"
+          "$GODOT_BIN" --version
+
+      - name: Install Godot export templates
+        run: |
+          set -e
+          curl -fL "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_CHANNEL}/Godot_v${GODOT_VERSION}-${GODOT_CHANNEL}_export_templates.tpz" -o "$RUNNER_TEMP/templates.tpz"
+          mkdir -p "$RUNNER_TEMP/template-extract"
+          unzip -o "$RUNNER_TEMP/templates.tpz" -d "$RUNNER_TEMP/template-extract"
+          TEMPLATE_DIR="$(find "$RUNNER_TEMP/template-extract" -type d -name templates -print -quit)"
+          if [ -z "$TEMPLATE_DIR" ]; then
+            TEMPLATE_DIR="$RUNNER_TEMP/template-extract"
+          fi
+          DEST="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.${GODOT_CHANNEL}"
+          mkdir -p "$DEST"
+          cp -R "$TEMPLATE_DIR"/. "$DEST/"
+
+      - name: Import project (validates every GDScript)
+        run: |
+          set -e
+          touch error.log
+          "$GODOT" --headless --path . --import 2>&1 | tee import.log || true
+          if grep -E "SCRIPT ERROR|Parse Error|Invalid" import.log; then
+            echo "GDScript 编译错误，终止构建"
+            exit 1
+          fi
+
+      - name: Export iOS Xcode project
+        run: |
+          set -e
+          mkdir -p build
+          "$GODOT" --headless --path . --export-release "iOS" build/ios.zip 2>&1 | tee export.log
+          # export_project_only=true 时 Godot 只写 Xcode 工程目录（不打包 zip），
+          # 工程名取自导出路径的文件名（ios.zip → build/ios.xcodeproj）
+          test -d build/ios.xcodeproj
+
+      - name: Locate Xcode project
+        run: |
+          set -e
+          XCODEPROJ="$(find build -maxdepth 2 -name '*.xcodeproj' -print -quit)"
+          if [ -z "$XCODEPROJ" ]; then
+            echo "ERROR: 没有找到 Xcode 项目"
+            find build -maxdepth 3 -print
+            exit 1
+          fi
+          echo "XCODEPROJ=$XCODEPROJ" >> "$GITHUB_ENV"
+          echo "Xcode project: $XCODEPROJ"
+
+      - name: Build unsigned iOS app
+        run: |
+          set -e
+          SCHEME="$(basename "$XCODEPROJ" .xcodeproj)"
+          xcodebuild \
+            -project "$XCODEPROJ" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+          APP_PATH="$(find build/DerivedData/Build/Products -maxdepth 5 -type d -name '*.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Xcode 没有生成 .app"
+            find build/DerivedData/Build/Products -maxdepth 5 -print
+            exit 1
+          fi
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+      - name: Package IPA
+        run: |
+          set -e
+          mkdir -p build/ipa/Payload
+          cp -R "$APP_PATH" build/ipa/Payload/
+          cd build/ipa
+          zip -r ../JokerRogue-unsigned.ipa Payload
+          test -s ../JokerRogue-unsigned.ipa
+          ls -lh ../JokerRogue-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JokerRogue-ios-unsigned
+          path: build/JokerRogue-unsigned.ipa
+          retention-days: 14
+
+      - name: Logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            import.log
+            export.log
