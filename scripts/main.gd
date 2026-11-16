@@ -459,7 +459,7 @@ func _end_overlay() -> void:
 	if old:
 		remove_child(old)
 		old.queue_free()
-	if GameManager.phase == "playing":
+	if GameManager.phase != "won" and GameManager.phase != "lost":  # 商店阶段(shop)也不能弹结算
 		_end_shown = false
 		return
 	var c := CenterContainer.new()
