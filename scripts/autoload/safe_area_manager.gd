@@ -16,19 +16,42 @@ func _ready() -> void:
 
 func system_insets() -> Dictionary:
 	var out := {"left": CORNER_MIN, "right": CORNER_MIN, "top": CORNER_MIN, "bottom": CORNER_MIN}
+	var vp := get_viewport().get_visible_rect().size
 	var scr := Vector2(DisplayServer.screen_get_size())
-	var win := Vector2(DisplayServer.window_get_size())
 	var sa := Rect2(DisplayServer.get_display_safe_area())
-	if scr.x <= 0 or win.x <= 0 or sa.size.x <= 0: return out
-	var k := get_viewport().get_visible_rect().size / win
-	out["left"] = maxf(CORNER_MIN, sa.position.x * k.x)
-	out["top"] = maxf(CORNER_MIN, sa.position.y * k.y)
-	out["right"] = maxf(CORNER_MIN, (scr.x - sa.end.x) * k.x)
-	out["bottom"] = maxf(CORNER_MIN, (scr.y - sa.end.y) * k.y)
+	if scr.x <= 0 or scr.y <= 0 or sa.size.x <= 0 or sa.size.y <= 0: return out
+	var k := vp / scr  # 屏幕像素 -> 视口单位
+	var l := sa.position.x * k.x
+	var r := (scr.x - sa.end.x) * k.x
+	var t := sa.position.y * k.y
+	var b := (scr.y - sa.end.y) * k.y
+	# 合理性校验：某些设备/横屏方向下系统返回的右(或左)边距会异常巨大，
+	# 真实的刘海/灵动岛边距不会超过屏幕宽度的 9%。异常侧改用对侧的值（刘海机左右对称）。
+	var max_x := vp.x * 0.09
+	var max_y := vp.y * 0.12
+	var lv := l <= max_x
+	var rv := r <= max_x
+	if lv and not rv: r = l
+	elif rv and not lv: l = r
+	elif not lv and not rv:
+		l = vp.x * 0.05 if OS.get_name() == "iOS" else 0.0
+		r = l
+	if t > max_y: t = 0.0
+	if b > max_y: b = 0.0
+	out["left"] = maxf(CORNER_MIN, l)
+	out["right"] = maxf(CORNER_MIN, r)
+	out["top"] = maxf(CORNER_MIN, t)
+	out["bottom"] = maxf(CORNER_MIN, b)
 	return out
 
 func effective() -> Dictionary:
-	return values.duplicate() if manual else system_insets()
+	var e: Dictionary = values.duplicate() if manual else system_insets()
+	var vp := get_viewport().get_visible_rect().size
+	e["left"] = clampf(e["left"], 0.0, vp.x * 0.25)  # 兜底：任何情况下都不允许吞掉半个屏幕
+	e["right"] = clampf(e["right"], 0.0, vp.x * 0.25)
+	e["top"] = clampf(e["top"], 0.0, vp.y * 0.25)
+	e["bottom"] = clampf(e["bottom"], 0.0, vp.y * 0.25)
+	return e
 
 func usable_rect() -> Rect2:
 	var e := effective()

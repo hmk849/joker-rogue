@@ -3,7 +3,7 @@ extends Control
 # 程序化绘制的扑克牌：立体阴影、花色图形、点数排布、增强/版本/蜡封、牌背、翻转。
 const W := 100.0
 const H := 140.0
-const SUIT_COL := [Color(0.1, 0.1, 0.16), Color(0.86, 0.12, 0.2), Color(0.1, 0.1, 0.16), Color(0.86, 0.12, 0.2)]
+const SUIT_COL := [Color(0.1, 0.12, 0.3), Color(0.78, 0.13, 0.27), Color(0.1, 0.12, 0.3), Color(0.78, 0.13, 0.27)]
 const NAMES := {11: "J", 12: "Q", 13: "K", 14: "A"}
 const P4 := [[.3, .2], [.7, .2], [.3, .8], [.7, .8]]
 const P6 := [[.3, .2], [.7, .2], [.3, .5], [.7, .5], [.3, .8], [.7, .8]]
@@ -67,20 +67,24 @@ func _draw() -> void:
 	else: _back()
 
 func _back() -> void:
-	draw_style_box(UIStyle.box(Color(0.12, 0.2, 0.4), Color(0.92, 0.92, 0.97), 3, 10), Rect2(0, 0, W, H))
-	draw_style_box(UIStyle.box(Color(0.16, 0.28, 0.55), Color(0.5, 0.65, 0.95), 2, 6), Rect2(8, 8, W - 16, H - 16))
-	for ix in 5:
-		for iy in 7:
-			var c := Vector2(22 + ix * 14.0, 24 + iy * 15.0)
-			draw_colored_polygon(PackedVector2Array([c + Vector2(0, -5), c + Vector2(4, 0), c + Vector2(0, 5), c + Vector2(-4, 0)]), Color(1, 1, 1, 0.1))
-	_suit(Vector2(W / 2, H / 2), 16.0, 3, Color(1, 0.8, 0.3))
+	draw_style_box(UIStyle.box(Astral.INDIGO.darkened(0.35), Astral.GOLD, 3, 10), Rect2(0, 0, W, H))
+	draw_style_box(UIStyle.box(Astral.INDIGO, Astral.GOLD_DIM, 1, 6), Rect2(8, 8, W - 16, H - 16))
+	var c := Vector2(W / 2, H / 2)
+	draw_arc(c, 34.0, 0.0, TAU, 48, Astral.GOLD, 2.0, true)
+	draw_arc(c, 27.0, 0.0, TAU, 48, Astral.GOLD_DIM, 1.0, true)
+	for i in 12:
+		var d := Vector2(cos(TAU * i / 12.0), sin(TAU * i / 12.0))
+		draw_line(c + d * 34.0, c + d * 40.0, Astral.GOLD, 2.0)
+	draw_colored_polygon(PackedVector2Array([c + Vector2(0, -21), c + Vector2(5, -5), c + Vector2(21, 0), c + Vector2(5, 5), c + Vector2(0, 21), c + Vector2(-5, 5), c + Vector2(-21, 0), c + Vector2(-5, -5)]), Astral.GOLD)
+	for p in [Vector2(17, 17), Vector2(W - 17, 17), Vector2(17, H - 17), Vector2(W - 17, H - 17)]: Astral.diamond(self, p, 3.0, Astral.GOLD)
 
 func _face(k: float) -> void:
 	var e := String(card.get("enh", ""))
 	var ed := String(card.get("ed", ""))
-	var bg: Color = {"bonus": Color(0.8, 0.9, 1.0), "mult": Color(1, 0.84, 0.84), "glass": Color(0.85, 0.96, 1.0), "stone": Color(0.62, 0.62, 0.66), "steel": Color(0.76, 0.81, 0.86), "lucky": Color(0.86, 0.95, 0.8)}.get(e, Color(0.98, 0.96, 0.9))
-	var edge := Color(1, 0.8, 0.2) if selected else Color(0.2, 0.2, 0.26)
+	var bg: Color = {"bonus": Color(0.8, 0.9, 1.0), "mult": Color(1, 0.84, 0.84), "glass": Color(0.85, 0.96, 1.0), "stone": Color(0.62, 0.62, 0.66), "steel": Color(0.76, 0.81, 0.86), "lucky": Color(0.86, 0.95, 0.8)}.get(e, Astral.PARCHMENT)
+	var edge := Astral.GOLD if selected else Color(0.45, 0.36, 0.18)
 	draw_style_box(UIStyle.box(bg, edge, 4 if selected else 2, 10), Rect2(0, 0, W, H))
+	draw_style_box(UIStyle.box(Color(0, 0, 0, 0), Color(0.62, 0.5, 0.26, 0.75), 1, 6), Rect2(5, 5, W - 10, H - 10))
 	var s: int = card["suit"]
 	var r: int = card["rank"]
 	var col: Color = SUIT_COL[s]

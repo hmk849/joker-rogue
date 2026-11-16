@@ -154,13 +154,14 @@ func _left() -> Control:
 	L["boss"].autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
 	L["boss"].custom_minimum_size.x = 220
 	L["reward"] = UIStyle.label("", 20, Color(1, 0.85, 0.3))
-	L["score"] = UIStyle.label("0", 44, Color(0.5, 1, 0.7))
+	L["score"] = UIStyle.label("0", 44, Astral.TEAL.lightened(0.35))
 	v.add_child(L["blind"])
 	v.add_child(L["boss"])
-	v.add_child(UIStyle.label("目标分数", 18, Color(0.7, 0.75, 0.85)))
+	v.add_child(Astral.divider(210))
+	v.add_child(UIStyle.label("目标分数", 18, Astral.GOLD_DIM))
 	v.add_child(L["target"])
 	v.add_child(L["reward"])
-	v.add_child(UIStyle.label("本盲注得分", 18, Color(0.7, 0.75, 0.85)))
+	v.add_child(UIStyle.label("本盲注得分", 18, Astral.GOLD_DIM))
 	v.add_child(L["score"])
 	var sp := Control.new()
 	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -189,8 +190,8 @@ func _right() -> Control:
 	var hb := HBoxContainer.new()
 	hb.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(hb)
-	var cp := UIStyle.panel(Color(0.15, 0.35, 0.8), Color(1, 1, 1, 0.3))
-	var mp := UIStyle.panel(Color(0.85, 0.2, 0.25), Color(1, 1, 1, 0.3))
+	var cp := UIStyle.panel(Astral.TEAL.darkened(0.5), Astral.TEAL)
+	var mp := UIStyle.panel(Astral.CRIMSON.darkened(0.5), Astral.CRIMSON)
 	L["chips"] = UIStyle.label("0", 32)
 	L["mult"] = UIStyle.label("0", 32)
 	cp.add_child(L["chips"])
@@ -200,12 +201,12 @@ func _right() -> Control:
 	hb.add_child(mp)
 	L["money"] = UIStyle.label("", 34, Color(1, 0.85, 0.3))
 	v.add_child(L["money"])
-	v.add_child(UIStyle.label("小丑牌", 18, Color(0.7, 0.75, 0.85)))
+	v.add_child(UIStyle.label("小丑牌", 18, Astral.GOLD_DIM))
 	var g := GridContainer.new()
 	g.columns = 2
 	v.add_child(g)
 	L["jokers"] = g
-	v.add_child(UIStyle.label("消耗牌（点击使用）", 18, Color(0.7, 0.75, 0.85)))
+	v.add_child(UIStyle.label("消耗牌（点击使用）", 18, Astral.GOLD_DIM))
 	var g2 := GridContainer.new()
 	g2.columns = 2
 	v.add_child(g2)
@@ -213,7 +214,7 @@ func _right() -> Control:
 	var sp := Control.new()
 	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(sp)
-	L["deck"] = UIStyle.label("", 20, Color(0.7, 0.75, 0.85))
+	L["deck"] = UIStyle.label("", 20, Astral.GOLD_DIM)
 	v.add_child(L["deck"])
 	return p
 
@@ -224,6 +225,7 @@ func _center() -> Control:
 	play_area = Control.new()
 	play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	play_area.custom_minimum_size.y = 150
+	play_area.draw.connect(func(): Astral.draw_sigil(play_area, play_area.size / 2.0, minf(play_area.size.x, play_area.size.y) * 0.48))
 	c.add_child(play_area)
 	hand_view = HandView.new()
 	hand_view.custom_minimum_size.y = CardView.H * cs + 56
@@ -423,8 +425,10 @@ func _burst(pos: Vector2, col: Color) -> void:
 	p.initial_velocity_min = 150.0
 	p.initial_velocity_max = 420.0
 	p.gravity = Vector2(0, 600)
-	p.scale_amount_min = 3.0
-	p.scale_amount_max = 7.0
+	p.texture = Astral.star_texture()
+	p.angle_max = 180.0
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.3
 	p.color = col
 	fx.add_child(p)
 	p.global_position = pos
@@ -543,7 +547,7 @@ func _deck_select() -> void:
 	ov.name = "DeckSelect"
 	ov.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
-	bg.color = Color(0.04, 0.06, 0.09, 0.98)
+	bg.color = Color(0.02, 0.03, 0.08, 0.86)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ov.add_child(bg)
 	var safe := SafeBox.new()
@@ -553,7 +557,8 @@ func _deck_select() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 14)
 	cc.add_child(v)
-	v.add_child(UIStyle.label("选择牌组", 40, Color(1, 0.85, 0.3)))
+	v.add_child(UIStyle.label("选择牌组", 40, Astral.GOLD))
+	v.add_child(Astral.divider(360))
 	var g := GridContainer.new()
 	g.columns = 3
 	g.add_theme_constant_override("h_separation", 12)

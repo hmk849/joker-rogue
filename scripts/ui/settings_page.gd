@@ -33,7 +33,7 @@ var holder: Control
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
-	bg.color = Color(0.04, 0.06, 0.09, 0.97)
+	bg.color = Color(0.02, 0.03, 0.08, 0.86)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	holder = SafeBox.new()
@@ -47,7 +47,7 @@ func _build() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	holder.add_child(v)
-	v.add_child(UIStyle.label("设置", 34, Color(1, 0.85, 0.3)))
+	v.add_child(UIStyle.label("设置", 34, Astral.GOLD))
 	var tabs := TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tabs.add_theme_font_size_override("font_size", 22)

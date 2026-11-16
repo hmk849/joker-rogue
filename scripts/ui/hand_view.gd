@@ -55,6 +55,7 @@ func layout(animate: bool) -> void:
 	var cw := CardView.W * UIManager.card_scale()
 	var ch := CardView.H * UIManager.card_scale()
 	var step := minf(cw + 10.0, (size.x - cw) / maxf(n - 1, 1))
+	step = maxf(step, cw * 0.45)  # 极窄屏时牌会溢出两侧而不是彻底叠死
 	var x0 := (size.x - (step * (n - 1) + cw)) * 0.5
 	var mid := (n - 1) * 0.5
 	for i in n:
@@ -139,3 +140,10 @@ func _release() -> void:
 			selection_changed.emit()
 	_press = null
 	_dragging = false
+
+func _draw() -> void:  # 手牌下方的黄铜导轨
+	var y := size.y - 3.0
+	draw_line(Vector2(40, y), Vector2(size.x - 40, y), Color(Astral.GOLD_DIM, 0.35), 2.0)
+	Astral.diamond(self, Vector2(size.x / 2.0, y), 5.0, Color(Astral.GOLD, 0.7))
+	Astral.diamond(self, Vector2(40, y), 3.0, Color(Astral.GOLD_DIM, 0.6))
+	Astral.diamond(self, Vector2(size.x - 40, y), 3.0, Color(Astral.GOLD_DIM, 0.6))
