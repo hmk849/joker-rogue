@@ -67,24 +67,24 @@ func _draw() -> void:
 	else: _back()
 
 func _back() -> void:
-	draw_style_box(UIStyle.box(Astral.INDIGO.darkened(0.35), Astral.GOLD, 3, 10), Rect2(0, 0, W, H))
-	draw_style_box(UIStyle.box(Astral.INDIGO, Astral.GOLD_DIM, 1, 6), Rect2(8, 8, W - 16, H - 16))
+	draw_style_box(UIStyle.box(Astral.TEAL.darkened(0.55), Color(0, 0, 0, 0), 0, 10), Rect2(0, 0, W, H))
+	Sketch.stroke(self, Sketch.round_rect(Rect2(1.5, 1.5, W - 3, H - 3), 10.0), Color(0.95, 0.92, 0.82), 2.6, 3)
+	Sketch.stroke(self, Sketch.round_rect(Rect2(9, 9, W - 18, H - 18), 6.0), Color(0.95, 0.92, 0.82, 0.55), 1.4, 8)
 	var c := Vector2(W / 2, H / 2)
-	draw_arc(c, 34.0, 0.0, TAU, 48, Astral.GOLD, 2.0, true)
-	draw_arc(c, 27.0, 0.0, TAU, 48, Astral.GOLD_DIM, 1.0, true)
-	for i in 12:
-		var d := Vector2(cos(TAU * i / 12.0), sin(TAU * i / 12.0))
-		draw_line(c + d * 34.0, c + d * 40.0, Astral.GOLD, 2.0)
-	draw_colored_polygon(PackedVector2Array([c + Vector2(0, -21), c + Vector2(5, -5), c + Vector2(21, 0), c + Vector2(5, 5), c + Vector2(0, 21), c + Vector2(-5, 5), c + Vector2(-21, 0), c + Vector2(-5, -5)]), Astral.GOLD)
-	for p in [Vector2(17, 17), Vector2(W - 17, 17), Vector2(17, H - 17), Vector2(W - 17, H - 17)]: Astral.diamond(self, p, 3.0, Astral.GOLD)
+	Sketch.stroke(self, Sketch.circle(c, 30.0, 32), Color(Astral.GOLD, 0.9), 2.0, 12)
+	Sketch.stroke(self, Sketch.circle(c, 22.0, 28), Color(Astral.GOLD, 0.5), 1.2, 15)
+	Sketch.star(self, c, 14.0, Astral.GOLD, 20)
+	for p in [Vector2(20, 22), Vector2(W - 20, 22), Vector2(20, H - 22), Vector2(W - 20, H - 22)]: Sketch.star(self, p, 4.0, Color(0.95, 0.92, 0.82, 0.8), int(p.x + p.y))
 
 func _face(k: float) -> void:
 	var e := String(card.get("enh", ""))
 	var ed := String(card.get("ed", ""))
 	var bg: Color = {"bonus": Color(0.8, 0.9, 1.0), "mult": Color(1, 0.84, 0.84), "glass": Color(0.85, 0.96, 1.0), "stone": Color(0.62, 0.62, 0.66), "steel": Color(0.76, 0.81, 0.86), "lucky": Color(0.86, 0.95, 0.8)}.get(e, Astral.PARCHMENT)
 	var edge := Astral.GOLD if selected else Color(0.45, 0.36, 0.18)
-	draw_style_box(UIStyle.box(bg, edge, 4 if selected else 2, 10), Rect2(0, 0, W, H))
-	draw_style_box(UIStyle.box(Color(0, 0, 0, 0), Color(0.62, 0.5, 0.26, 0.75), 1, 6), Rect2(5, 5, W - 10, H - 10))
+	draw_style_box(UIStyle.box(bg, Color(0, 0, 0, 0), 0, 10), Rect2(0, 0, W, H))
+	var sd := int(card["rank"]) * 13 + int(card["suit"])
+	Sketch.stroke(self, Sketch.round_rect(Rect2(1.5, 1.5, W - 3, H - 3), 10.0), Astral.GOLD if selected else Color(0.14, 0.11, 0.16), 3.4 if selected else 2.4, sd)
+	Sketch.stroke(self, Sketch.round_rect(Rect2(6, 6, W - 12, H - 12), 6.0), Color(0.45, 0.33, 0.2, 0.5), 1.1, sd + 5)
 	var s: int = card["suit"]
 	var r: int = card["rank"]
 	var col: Color = SUIT_COL[s]

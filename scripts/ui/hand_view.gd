@@ -141,9 +141,7 @@ func _release() -> void:
 	_press = null
 	_dragging = false
 
-func _draw() -> void:  # 手牌下方的黄铜导轨
+func _draw() -> void:  # 手牌下方的粉笔导轨
 	var y := size.y - 3.0
-	draw_line(Vector2(40, y), Vector2(size.x - 40, y), Color(Astral.GOLD_DIM, 0.35), 2.0)
-	Astral.diamond(self, Vector2(size.x / 2.0, y), 5.0, Color(Astral.GOLD, 0.7))
-	Astral.diamond(self, Vector2(40, y), 3.0, Color(Astral.GOLD_DIM, 0.6))
-	Astral.diamond(self, Vector2(size.x - 40, y), 3.0, Color(Astral.GOLD_DIM, 0.6))
+	Sketch.line(self, Vector2(40, y), Vector2(size.x - 40, y), Color(Astral.CHALK, 0.4), 2.0, 7)
+	Sketch.star(self, Vector2(size.x / 2.0, y), 6.0, Color(Astral.GOLD, 0.8), 9)

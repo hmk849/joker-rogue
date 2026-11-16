@@ -17,7 +17,7 @@ var discard_btn: Button
 var _t := 0.0
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	cs = UIManager.card_scale()
 	_setup_fx()
 	_build()
@@ -38,7 +38,7 @@ var _end_shown := false
 
 func _setup_fx() -> void:
 	var bg := ColorRect.new()
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bg_mat = ShaderMaterial.new()
 	bg_mat.shader = FxShaders.shader("bg")
@@ -47,7 +47,7 @@ func _setup_fx() -> void:
 	post_layer = CanvasLayer.new()
 	post_layer.layer = 100
 	var pr := ColorRect.new()
-	pr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	pr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	post_mat = ShaderMaterial.new()
 	post_mat.shader = FxShaders.shader("post")
@@ -139,7 +139,7 @@ func _build() -> void:
 	for p in parts: body.add_child(p)
 	fx = Control.new()
 	fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fx.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(fx)
 
 func _left() -> Control:
@@ -464,12 +464,12 @@ func _end_overlay() -> void:
 		return
 	var c := CenterContainer.new()
 	c.name = "EndOverlay"
-	c.set_anchors_preset(Control.PRESET_FULL_RECT)
+	c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var bgc := ColorRect.new()
 	bgc.color = Color(0, 0, 0, 0.7)
-	bgc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bgc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var wrap := Control.new()
-	wrap.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wrap.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var p := UIStyle.panel(Color(0.1, 0.13, 0.18), Color(1, 0.8, 0.3))
 	var v := VBoxContainer.new()
 	p.add_child(v)
@@ -545,10 +545,10 @@ func _deck_select() -> void:
 	if busy or get_node_or_null("DeckSelect"): return
 	var ov := Control.new()
 	ov.name = "DeckSelect"
-	ov.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ov.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var bg := ColorRect.new()
 	bg.color = Color(0.02, 0.03, 0.08, 0.86)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ov.add_child(bg)
 	var safe := SafeBox.new()
 	ov.add_child(safe)

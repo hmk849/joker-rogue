@@ -37,8 +37,8 @@ static func _btn(bg: Color, edge: Color) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
 	s.bg_color = bg
 	s.border_color = edge
-	s.set_border_width_all(2)
-	s.set_corner_radius_all(5)
+	s.set_border_width_all(0)
+	s.set_corner_radius_all(10)
 	s.shadow_color = Color(0, 0, 0, 0.45)
 	s.shadow_size = 5
 	s.shadow_offset = Vector2(0, 3)

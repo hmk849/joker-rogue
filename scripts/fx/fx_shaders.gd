@@ -18,22 +18,30 @@ float fbm(vec2 p) {
 void fragment() {
 	vec2 uv = (UV - 0.5) * vec2(1.78, 1.0);
 	float t = TIME * speed;
-	vec3 col = mix(vec3(0.025, 0.035, 0.09), vec3(0.07, 0.055, 0.17), UV.y);
-	float n = fbm(uv * 2.2 + vec2(t * 0.02, -t * 0.015));
-	float n2 = fbm(uv * 3.5 - vec2(t * 0.03, 0.0) + 4.0);
-	col += vec3(0.08, 0.24, 0.32) * smoothstep(0.35, 0.9, n) * 0.55;
-	col += vec3(0.3, 0.12, 0.4) * smoothstep(0.4, 0.95, n2) * 0.4;
-	vec2 gp = (uv + 0.5) * vec2(60.0, 34.0);
+	vec3 col = mix(vec3(0.07, 0.09, 0.17), vec3(0.1, 0.08, 0.16), UV.y);
+	float n = fbm(uv * 1.7 + vec2(t * 0.01, -t * 0.008));
+	float rim = smoothstep(0.0, 0.03, abs(n - 0.54));
+	col = mix(col, vec3(0.13, 0.32, 0.38), smoothstep(0.54, 0.6, n) * 0.5);
+	col -= (1.0 - rim) * 0.05;
+	float n2 = fbm(uv * 2.3 + 7.0 - vec2(t * 0.012, 0.0));
+	col = mix(col, vec3(0.36, 0.14, 0.24), smoothstep(0.58, 0.66, n2) * 0.4);
+	float n3 = fbm(uv * 3.1 + 15.0);
+	col = mix(col, vec3(0.4, 0.28, 0.1), smoothstep(0.64, 0.72, n3) * 0.3);
+	col += (hash(floor(FRAGCOORD.xy * 0.5)) - 0.5) * 0.04;
+	col += (vnoise(vec2(uv.x * 260.0, uv.y * 5.0)) - 0.5) * 0.035;
+	vec2 gp = (uv + 0.5) * vec2(36.0, 20.0);
 	float h = hash(floor(gp));
-	float tw = 0.6 + 0.4 * sin(t * 2.0 + h * 40.0);
-	col += vec3(1.0, 0.92, 0.7) * step(0.965, h) * smoothstep(0.35, 0.0, length(fract(gp) - 0.5)) * tw * 0.9;
+	vec2 f = fract(gp) - 0.5;
+	float cross_m = step(0.92, h) * smoothstep(0.035, 0.0, min(abs(f.x), abs(f.y))) * step(max(abs(f.x), abs(f.y)), 0.2);
+	col += vec3(0.95, 0.9, 0.75) * cross_m * (0.6 + 0.4 * sin(t * 2.0 + h * 40.0)) * 0.7;
 	float r = length(uv);
 	float ang = atan(uv.y, uv.x);
-	float ring = smoothstep(0.004, 0.0, abs(r - 0.55)) + smoothstep(0.003, 0.0, abs(r - 0.5)) * 0.6 + smoothstep(0.003, 0.0, abs(r - 0.78)) * 0.5;
-	float a = fract((ang + t * 0.03) * 24.0 / 6.2832);
-	float tick = smoothstep(0.05, 0.0, min(a, 1.0 - a)) * step(0.55, r) * step(r, 0.59);
-	col += vec3(0.95, 0.78, 0.4) * (ring * 0.2 + tick * 0.22);
-	col *= 1.0 - 0.45 * dot(uv, uv);
+	float rr = r + (vnoise(vec2(ang * 3.0, 1.0)) - 0.5) * 0.02;
+	float ring = smoothstep(0.004, 0.0, abs(rr - 0.55)) + smoothstep(0.003, 0.0, abs(rr - 0.5)) * 0.5 + smoothstep(0.003, 0.0, abs(rr - 0.78)) * 0.4;
+	float a2 = fract((ang + t * 0.02) * 24.0 / 6.2832);
+	float tick = smoothstep(0.05, 0.0, min(a2, 1.0 - a2)) * step(0.55, r) * step(r, 0.585);
+	col += vec3(0.95, 0.9, 0.78) * (ring * 0.16 + tick * 0.18);
+	col *= 1.0 - 0.4 * dot(uv, uv);
 	COLOR = vec4(col, 1.0);
 }
 """

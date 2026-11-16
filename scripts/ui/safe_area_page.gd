@@ -7,7 +7,7 @@ var spins := {}
 var _sync := false
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var safe := preload("res://scripts/ui/safe_area_container.gd").new()
 	add_child(safe)
