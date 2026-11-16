@@ -13,14 +13,7 @@ var _t := 0.0
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var bg := ColorRect.new()
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var m := ShaderMaterial.new()
-	m.shader = FxShaders.shader("bg")
-	m.set_shader_parameter("detail", 4)
-	bg.material = m
-	add_child(bg)
-	add_child(BgDoodles.new())
+	_make_bg()
 	var safe := SafeBox.new()
 	add_child(safe)
 	var hb := HBoxContainer.new()
@@ -33,7 +26,12 @@ func _ready() -> void:
 	title = UIStyle.label("小丑肉鸽", 120, Astral.CHALK)
 	title.add_theme_constant_override("outline_size", 14)
 	title.add_theme_color_override("font_outline_color", Astral.INK)
-	left.add_child(title)
+	if ThemeManager.style() == "sketch":
+		left.add_child(title)
+	else:  # 木牌 / 丝绒铭牌承托标题
+		var plate := UIStyle.panel(Astral.NIGHT, Astral.GOLD)
+		plate.add_child(title)
+		left.add_child(plate)
 	left.add_child(UIStyle.label("J O K E R   R O G U E", 28, Astral.GOLD))
 	left.add_child(Astral.divider(440))
 	var col := VBoxContainer.new()
@@ -43,7 +41,7 @@ func _ready() -> void:
 	col.add_child(_btn("开始游戏", Color(0.2, 0.45, 0.85), func(): start_new.emit()))
 	col.add_child(_btn("设置", Color(0.3, 0.3, 0.38), func(): open_settings.emit()))
 	if OS.get_name() != "iOS": col.add_child(_btn("退出", Color(0.55, 0.25, 0.25), func(): get_tree().quit()))
-	left.add_child(UIStyle.label("夜之手账 · 单机肉鸽卡牌", 16, Astral.GOLD_DIM))
+	left.add_child(UIStyle.label("%s · %s" % [ThemeManager.theme_name(), ThemeManager.THEMES[ThemeManager.current]["en"]], 18, Astral.GOLD_DIM))
 	fan_area = Control.new()
 	fan_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hb.add_child(fan_area)
@@ -75,3 +73,18 @@ func _process(dt: float) -> void:
 		v.position = c + Vector2(o * 88.0, absf(o) * absf(o) * 12.0 - 10.0 + sin(_t * 1.3 + i) * 8.0) - v.size / 2.0
 		v.rotation = o * 0.2 + sin(_t * 0.9 + i * 0.7) * 0.03
 	if fan.size() == 5: fan_area.move_child(fan[2], -1)
+
+func _make_bg() -> void:  # 主界面背景：夜之手账=流动手绘漩涡；咸风酒馆=风暴码头；暗河赌厅=威尼斯地下拱廊
+	if ThemeManager.current == 0:
+		var bg := ColorRect.new()
+		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var m := ShaderMaterial.new()
+		m.shader = FxShaders.shader("bg")
+		m.set_shader_parameter("detail", 4)
+		bg.material = m
+		add_child(bg)
+		add_child(BgDoodles.new())
+	else:
+		var sc := ThemeScene.new()
+		sc.kind = "harbor" if ThemeManager.current == 1 else "vault"
+		add_child(sc)

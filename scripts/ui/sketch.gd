@@ -16,6 +16,7 @@ static func circle(c: Vector2, rad: float, seg: int = 64) -> PackedVector2Array:
 	return pts
 
 static func rough(pts: PackedVector2Array, amp: float, seed: int, closed: bool = true) -> PackedVector2Array:
+	amp *= ThemeManager.jitter()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
 	var out := PackedVector2Array()
@@ -31,7 +32,7 @@ static func rough(pts: PackedVector2Array, amp: float, seed: int, closed: bool =
 
 static func stroke(c: CanvasItem, pts: PackedVector2Array, col: Color, w: float, seed: int, closed: bool = true) -> void:
 	c.draw_polyline(rough(pts, 1.3, seed, closed), col, w, true)
-	c.draw_polyline(rough(pts, 1.8, seed + 977, closed), Color(col, col.a * 0.5), maxf(w * 0.55, 1.0), true)
+	if ThemeManager.jitter() > 0.5: c.draw_polyline(rough(pts, 1.8, seed + 977, closed), Color(col, col.a * 0.5), maxf(w * 0.55, 1.0), true)
 
 static func line(c: CanvasItem, a: Vector2, b: Vector2, col: Color, w: float, seed: int) -> void:
 	stroke(c, PackedVector2Array([a, b]), col, w, seed, false)

@@ -23,12 +23,14 @@ const SPEC := {
 		["sensitivity", "操作灵敏度", "slider", 0.5, 2.0, 0.1],
 	],
 	"界面": [
+		["theme", "游戏主题（含界面/背景/音乐）", "choice", ["夜之手账", "咸风酒馆", "暗河赌厅"]],
 		["ui_scale", "UI 整体缩放", "slider", 0.8, 1.3, 0.05], ["card_size", "卡牌大小", "slider", 0.8, 1.3, 0.05],
 		["font_size", "字体大小", "slider", 0.8, 1.4, 0.05], ["ui_spacing", "界面间距", "slider", 0.6, 1.6, 0.1],
 		["layout_flipped", "左右布局对调", "bool"], ["info_density", "信息密度", "choice", ["精简", "标准", "详细"]],
 	],
 }
 var holder: Control
+var _tab := 0
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -52,6 +54,7 @@ func _build() -> void:
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tabs.add_theme_font_size_override("font_size", 22)
 	v.add_child(tabs)
+	tabs.tab_changed.connect(func(i: int): _tab = i)
 	for name in SPEC:
 		var sc := ScrollContainer.new()
 		sc.name = name
@@ -62,6 +65,7 @@ func _build() -> void:
 		sc.add_child(col)
 		for s in SPEC[name]: _row(col, s)
 		tabs.add_child(sc)
+	tabs.current_tab = _tab
 	var bar := HBoxContainer.new()
 	bar.add_theme_constant_override("separation", 16)
 	v.add_child(bar)

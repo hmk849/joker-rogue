@@ -6,7 +6,7 @@ const DEFAULTS := {
 	"card_anim_speed": 1.0, "bg_effects": true, "high_contrast": false, "color_mode": 0, "fullscreen": true,
 	"vol_master": 1.0, "vol_music": 0.7, "vol_sfx": 0.9, "music_on": true, "sfx_on": true,
 	"tap_select": true, "drag_select": true, "auto_arrange": true, "auto_sort": 1, "haptics": true, "sensitivity": 1.0,
-	"ui_scale": 1.0, "card_size": 1.0, "font_size": 1.0, "ui_spacing": 1.0, "layout_flipped": false, "info_density": 1,
+	"theme": 0, "ui_scale": 1.0, "card_size": 1.0, "font_size": 1.0, "ui_spacing": 1.0, "layout_flipped": false, "info_density": 1,
 }
 var data: Dictionary = DEFAULTS.duplicate()
 

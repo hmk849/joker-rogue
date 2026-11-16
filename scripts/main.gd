@@ -21,8 +21,8 @@ func _ready() -> void:
 	cs = UIManager.card_scale()
 	_setup_fx()
 	_build()
-	move_child(root_box, 2)
-	move_child(fx, 3)
+	move_child(root_box, 1)
+	move_child(fx, 2)
 	GameManager.state_changed.connect(func():
 		if busy: pending = true
 		else: _refresh())
@@ -37,14 +37,7 @@ var _rebuild_timer: Timer
 var _end_shown := false
 
 func _setup_fx() -> void:
-	var bg := ColorRect.new()
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bg_mat = ShaderMaterial.new()
-	bg_mat.shader = FxShaders.shader("bg")
-	bg.material = bg_mat
-	add_child(bg)
-	add_child(BgDoodles.new())
+	_make_bg()
 	post_layer = CanvasLayer.new()
 	post_layer.layer = 100
 	var pr := ColorRect.new()
@@ -61,10 +54,12 @@ func _setup_fx() -> void:
 	_rebuild_timer.timeout.connect(_rebuild_ui)
 	add_child(_rebuild_timer)
 	SettingsManager.changed.connect(_on_setting)
+	ThemeManager.changed.connect(_on_theme)
 	_bg_update()
 	_post_update()
 
 func _bg_update() -> void:
+	if bg_mat == null: return
 	bg_mat.set_shader_parameter("speed", 1.0 if bool(SettingsManager.get_value("bg_effects")) else 0.0)
 	bg_mat.set_shader_parameter("detail", [1, 2, 3, 5][clampi(int(SettingsManager.get_value("quality")), 0, 3)])
 
@@ -92,8 +87,8 @@ func _rebuild_ui() -> void:
 		remove_child(n)
 		n.queue_free()
 	_build()
-	move_child(root_box, 2)
-	move_child(fx, 3)
+	move_child(root_box, 1)
+	move_child(fx, 2)
 	_refresh()
 
 func _open_settings() -> void:
@@ -119,7 +114,8 @@ func _idle(b: Control) -> void:  # 小丑牌独立的待机摆动
 # 右侧：顶部小丑牌区 + 消耗牌区，中间出牌区，下方 出牌·排序·弃牌 按钮，最下是手牌 + 牌堆
 var blind_panel: OrnatePanel
 
-func _box(bg: Color, accent: Color = Astral.GOLD_DIM, pad: float = 8.0) -> OrnatePanel:
+func _box(bg: Color, accent: Color = Color(-1, -1, -1), pad: float = 8.0) -> OrnatePanel:
+	if accent.r < 0.0: accent = Astral.GOLD_DIM
 	var p := UIStyle.panel(bg, accent) as OrnatePanel
 	p.plain = true
 	p.set_pad(pad)
@@ -723,3 +719,45 @@ func _slot_ph() -> Control:  # 空槽位的虚线轮廓（像原版）
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.draw.connect(func(): Sketch.stroke(p, Sketch.round_rect(Rect2(3, 3, 94, 64), 8.0), Color(Astral.CHALK, 0.22), 1.6, 17))
 	return p
+
+# ---------- 主题：局内背景 / 切换联动 ----------
+# 夜之手账=流动手绘漩涡+涂鸦；咸风酒馆=酒馆内景(摇晃提灯/木桶/窗外风暴)；暗河赌厅=赌桌(毛毡/筹码/烛台/烟雾)
+var bg_holder: Control
+
+func _make_bg() -> void:
+	if bg_holder:
+		remove_child(bg_holder)
+		bg_holder.queue_free()
+	bg_holder = Control.new()
+	bg_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg_holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg_mat = null
+	if ThemeManager.current == 0:
+		var bg := ColorRect.new()
+		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bg_mat = ShaderMaterial.new()
+		bg_mat.shader = FxShaders.shader("bg")
+		bg.material = bg_mat
+		bg_holder.add_child(bg)
+		bg_holder.add_child(BgDoodles.new())
+	else:
+		var sc := ThemeScene.new()
+		sc.kind = "tavern" if ThemeManager.current == 1 else "table"
+		bg_holder.add_child(sc)
+	add_child(bg_holder)
+	move_child(bg_holder, 0)
+	_bg_update()
+
+func _on_theme() -> void:
+	_make_bg()
+	_rebuild_ui()
+	var sp := get_node_or_null("SettingsPage")
+	var t := get_node_or_null("Title")
+	if t:
+		remove_child(t)
+		t.queue_free()
+		_show_title()
+	if sp:
+		sp.call("_build")
+		move_child(sp, get_child_count() - 1)

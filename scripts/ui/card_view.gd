@@ -67,6 +67,51 @@ func _draw() -> void:
 	else: _back()
 
 func _back() -> void:
+	match ThemeManager.style():
+		"wood": _back_wood()
+		"velvet": _back_velvet()
+		_: _back_sketch()
+
+# 咸风酒馆：深海蓝牌背 + 黄铜边 + 绳圈船锚 + 海浪
+func _back_wood() -> void:
+	draw_style_box(UIStyle.box(Color(0.09, 0.16, 0.28), Astral.GOLD, 3, 10), Rect2(0, 0, W, H))
+	draw_style_box(UIStyle.box(Color(0.12, 0.21, 0.36), Astral.GOLD_DIM, 1, 6), Rect2(8, 8, W - 16, H - 16))
+	var c := Vector2(W / 2, H / 2 - 6)
+	draw_arc(c, 32.0, 0.0, TAU, 40, Astral.CHALK, 3.0, true)
+	for i in 24:
+		var d := Vector2(cos(TAU * i / 24.0), sin(TAU * i / 24.0))
+		draw_line(c + d * 29.0, c + d * 35.0, Color(Astral.CHALK, 0.6), 1.2)
+	draw_arc(c + Vector2(0, -22), 5.0, 0.0, TAU, 12, Astral.GOLD, 2.2)
+	draw_line(c + Vector2(0, -17), c + Vector2(0, 20), Astral.GOLD, 2.6)
+	draw_line(c + Vector2(-9, -9), c + Vector2(9, -9), Astral.GOLD, 2.6)
+	draw_arc(c + Vector2(0, 8), 14.0, 0.15 * PI, 0.85 * PI, 14, Astral.GOLD, 2.6, true)
+	for k in 3:
+		var pts := PackedVector2Array()
+		for i in 13: pts.append(Vector2(14 + i * (W - 28) / 12.0, H - 22 - k * 6 + sin(i * 1.3 + k) * 2.5))
+		draw_polyline(pts, Color(Astral.CHALK, 0.55 - k * 0.12), 1.4)
+
+# 暗河赌厅：酒红丝绒 + 鎏金菱格 + 威尼斯面具
+func _back_velvet() -> void:
+	draw_style_box(UIStyle.box(Color(0.26, 0.05, 0.1), Astral.GOLD, 3, 8), Rect2(0, 0, W, H))
+	draw_style_box(UIStyle.box(Color(0.32, 0.08, 0.13), Color(Astral.GOLD, 0.5), 1, 5), Rect2(8, 8, W - 16, H - 16))
+	for i in 8:
+		draw_line(Vector2(8 + i * 14.0, 8), Vector2(W - 8, H - 8 - i * 14.0), Color(Astral.GOLD, 0.12), 1.0)
+		draw_line(Vector2(8, 8 + i * 14.0), Vector2(W - 8 - i * 14.0, H - 8), Color(Astral.GOLD, 0.12), 1.0)
+	var c := Vector2(W / 2, H / 2 + 2)
+	var mask := PackedVector2Array()
+	for p in [[-0.85, -0.1], [-0.55, -0.5], [0.0, -0.38], [0.55, -0.5], [0.85, -0.1], [0.6, 0.3], [0.18, 0.38], [0.0, 0.95], [-0.18, 0.38], [-0.6, 0.3]]: mask.append(c + Vector2(p[0], p[1]) * 30.0)
+	draw_colored_polygon(mask, Color(0.92, 0.78, 0.4))
+	for s in [-1.0, 1.0]:
+		var eye := PackedVector2Array()
+		for i in 12: eye.append(c + Vector2(s * 11.0 + cos(TAU * i / 12.0) * 7.0, -5.0 + sin(TAU * i / 12.0) * 4.0))
+		draw_colored_polygon(eye, Color(0.18, 0.03, 0.06))
+		draw_arc(c + Vector2(s * 26.0, -30.0), 12.0, PI * 1.1, PI * 1.9, 8, Astral.GOLD, 1.6)
+	var mc := mask.duplicate()
+	mc.append(mask[0])
+	draw_polyline(mc, Color(0.45, 0.3, 0.1), 1.6)
+	for p in [Vector2(16, 16), Vector2(W - 16, 16), Vector2(16, H - 16), Vector2(W - 16, H - 16)]: Astral.diamond(self, p, 3.0, Astral.GOLD)
+
+func _back_sketch() -> void:
 	draw_style_box(UIStyle.box(Astral.TEAL.darkened(0.55), Color(0, 0, 0, 0), 0, 10), Rect2(0, 0, W, H))
 	Sketch.stroke(self, Sketch.round_rect(Rect2(1.5, 1.5, W - 3, H - 3), 10.0), Color(0.95, 0.92, 0.82), 2.6, 3)
 	Sketch.stroke(self, Sketch.round_rect(Rect2(9, 9, W - 18, H - 18), 6.0), Color(0.95, 0.92, 0.82, 0.55), 1.4, 8)

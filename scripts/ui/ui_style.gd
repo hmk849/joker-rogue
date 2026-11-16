@@ -15,8 +15,9 @@ static func box(bg: Color, border: Color = Color(0, 0, 0, 0), bw: int = 0, r: in
 	_cache[key] = s
 	return s
 
-static func label(text: String, size: int = 20, col: Color = Astral.IVORY) -> Label:
+static func label(text: String, size: int = 20, col: Color = Color(-1, -1, -1)) -> Label:
 	var l := Label.new()
+	if col.r < 0.0: col = Astral.IVORY
 	l.text = text
 	l.add_theme_font_size_override("font_size", int(size * float(SettingsManager.get_value("font_size"))))
 	l.add_theme_color_override("font_color", col)
@@ -32,13 +33,13 @@ static func panel(bg: Color, border: Color = Color(1, 1, 1, 0.12)) -> PanelConta
 	return p
 
 static func _btn(bg: Color, edge: Color) -> StyleBoxFlat:
-	var key := "btn|%s|%s" % [bg, edge]
+	var key := "btn|%s|%s|%s" % [bg, edge, ThemeManager.style()]
 	if _cache.has(key): return _cache[key]
 	var s := StyleBoxFlat.new()
 	s.bg_color = bg
 	s.border_color = edge
 	s.set_border_width_all(0)
-	s.set_corner_radius_all(10)
+	s.set_corner_radius_all(10 if ThemeManager.style() == "sketch" else 6)
 	s.shadow_color = Color(0, 0, 0, 0.45)
 	s.shadow_size = 5
 	s.shadow_offset = Vector2(0, 3)

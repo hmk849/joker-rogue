@@ -25,7 +25,9 @@ func _ready() -> void:
 	music_player.bus = "Music"
 	music_player.volume_db = -5.0
 	add_child(music_player)
-	WorkerThreadPool.add_task(_build_music)  # 后台合成，不卡启动
+	SettingsManager.changed.connect(func(k: String):
+		if k == "theme": set_music(int(SettingsManager.get_value("theme"))))
+	set_music(int(SettingsManager.get_value("theme")))
 
 func apply_volumes() -> void:
 	var s := SettingsManager
@@ -209,8 +211,7 @@ func _lead(a: PackedFloat32Array, t0: float, dur: float, f: float, vol: float) -
 		var env := minf(1.0, t / 0.025) * exp(-1.1 * t) * minf(1.0, (dur - t) / 0.05)
 		a[idx] += (sin(TAU * ph) + 0.28 * sin(TAU * ph * 2.0) + 0.1 * sin(TAU * ph * 3.0)) * env * vol
 
-func _build_music() -> void:
-	_sr = 16000  # 此后只有本线程做合成（音效已在启动时生成完毕）
+func _build_music() -> AudioStreamWAV:  # 夜之手账：Lo-fi 爵士
 	var beat := 60.0 / 84.0
 	var a := _buf(beat * 4.0 * 16.0)
 	for bar in 16:
@@ -242,8 +243,162 @@ func _build_music() -> void:
 	for i in 160:
 		a[i] *= i / 160.0
 		a[n - 1 - i] *= i / 160.0
-	call_deferred("_start_music", _wav(a, true))
+	return _wav(a, true)
 
 func _start_music(stream: AudioStreamWAV) -> void:
 	music_player.stream = stream
 	music_player.play()
+
+# ---------- 按主题切换音乐（后台线程合成，合成过的会缓存）----------
+var tracks := {}
+var _want := 0
+var _building := false
+
+func set_music(id: int) -> void:
+	_want = id
+	if tracks.has(id):
+		music_player.stream = tracks[id]
+		music_player.play()
+	elif not _building:
+		_building = true
+		WorkerThreadPool.add_task(_music_job.bind(id))
+
+func _music_job(id: int) -> void:
+	_sr = 16000  # 此后只有本线程做合成（音效已在启动时生成完毕）
+	var st: AudioStreamWAV
+	match id:
+		1: st = _build_jig()
+		2: st = _build_waltz()
+		_: st = _build_music()
+	call_deferred("_music_ready", id, st)
+
+func _music_ready(id: int, st: AudioStreamWAV) -> void:
+	tracks[id] = st
+	_building = false
+	if tracks.has(_want):
+		if _want == id or not music_player.playing:
+			music_player.stream = tracks[_want]
+			music_player.play()
+	else:
+		_building = true
+		WorkerThreadPool.add_task(_music_job.bind(_want))
+
+func _reed(a: PackedFloat32Array, t0: float, dur: float, f: float, vol: float, vib: float, atk: float, dec: float) -> void:  # 簧片/提琴类
+	var n := int(dur * _sr)
+	var s0 := int(t0 * _sr)
+	var ph := 0.0
+	for i in n:
+		var idx := s0 + i
+		if idx >= a.size(): break
+		var t := float(i) / _sr
+		ph += f * (1.0 + vib * sin(TAU * 5.6 * t) * minf(1.0, t * 4.0)) / _sr
+		var env := minf(1.0, t / atk) * exp(-dec * t) * minf(1.0, (dur - t) / 0.03)
+		a[idx] += (sin(TAU * ph) + 0.5 * sin(TAU * ph * 2.0) + 0.33 * sin(TAU * ph * 3.0) + 0.2 * sin(TAU * ph * 4.0)) * env * vol
+
+func _harp(a: PackedFloat32Array, t0: float, dur: float, f: float, vol: float) -> void:  # 羽管键琴：明亮的拨弦
+	var n := int(dur * _sr)
+	var s0 := int(t0 * _sr)
+	var ph := 0.0
+	for i in n:
+		var idx := s0 + i
+		if idx >= a.size(): break
+		var t := float(i) / _sr
+		ph += f / _sr
+		var s := sin(TAU * ph) + 0.6 * sin(TAU * ph * 2.0) * exp(-3.0 * t) + 0.4 * sin(TAU * ph * 3.0) * exp(-6.0 * t) + 0.25 * sin(TAU * ph * 5.0) * exp(-10.0 * t)
+		a[idx] += s * exp(-4.5 * t) * minf(1.0, t / 0.002) * minf(1.0, (dur - t) / 0.02) * vol
+
+
+# 咸风酒馆：6/8 水手小调（D 米索利迪亚），手风琴反拍 + 提琴旋律 + 跺脚拍手；后半段加和声与铃鼓；底层是循环的海风海浪
+const JIG_CH := {"D": [62, 66, 69], "C": [60, 64, 67], "G": [59, 62, 67], "A": [61, 64, 69]}
+const JIG_ROOT := {"D": 38, "C": 36, "G": 43, "A": 45}
+const JIG_BARS := ["D", "D", "C", "C", "G", "G", "D", "D", "G", "G", "D", "D", "C", "C", "A", "D"]
+const JIG_MEL := [
+	[74, 76, 78, 81, 78, 76], [78, 74, 76, 78, 0, 74], [72, 74, 76, 79, 76, 74], [72, 76, 79, 76, 72, 0],
+	[71, 74, 79, 78, 74, 71], [74, 79, 83, 79, 74, 71], [78, 76, 74, 76, 78, 76], [74, 76, 74, 69, 0, 0],
+	[79, 78, 79, 83, 79, 78], [79, 83, 86, 83, 79, 74], [81, 78, 74, 78, 81, 78], [81, 0, 78, 74, 0, 0],
+	[79, 76, 72, 76, 79, 76], [84, 0, 79, 76, 72, 0], [76, 78, 76, 74, 73, 71], [74, 0, 0, 74, 0, 0],
+]
+
+func _build_jig() -> AudioStreamWAV:
+	var bar := 1.0
+	var e8 := bar / 6.0
+	var bars := 32
+	var a := _buf(bar * bars)
+	for b in bars:
+		var t0 := b * bar
+		var sec := b % 16
+		var cn: String = JIG_BARS[sec]
+		var notes: Array = JIG_CH[cn]
+		var root: int = JIG_ROOT[cn]
+		var second := b >= 16
+		_tone(a, t0, e8 * 2.6, _hz(root), _hz(root), 0.3, 1, 0.01, 3.5)
+		_tone(a, t0 + e8 * 3.0, e8 * 2.6, _hz(root + 7), _hz(root + 7), 0.26, 1, 0.01, 3.5)
+		for nn in notes:
+			_reed(a, t0 + e8 * 1.0, e8 * 1.5, _hz(nn), 0.05, 0.0, 0.01, 5.0)
+			_reed(a, t0 + e8 * 4.0, e8 * 1.5, _hz(nn), 0.05, 0.0, 0.01, 5.0)
+		var mel: Array = JIG_MEL[sec]
+		for k in 6:
+			var m: int = mel[k]
+			if m == 0: continue
+			_reed(a, t0 + e8 * k, e8 * 0.95, _hz(m), 0.1, 0.005, 0.015, 2.5)
+			if second: _reed(a, t0 + e8 * k, e8 * 0.95, _hz(m - 4), 0.05, 0.004, 0.015, 2.5)
+		_tone(a, t0, 0.12, 100, 45, 0.35, 0, 0.002, 18.0)
+		_tone(a, t0 + e8 * 3.0, 0.1, 100, 45, 0.28, 0, 0.002, 18.0)
+		_noise(a, t0 + e8 * 3.0, 0.08, 0.1, 25.0, 0.4)
+		if second:
+			for k in 6: _noise(a, t0 + e8 * k, 0.03, 0.035, 90.0, 0.9)
+	var n := a.size()
+	var y := 0.0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	for i in n:  # 海风海浪：低通噪声 + 缓慢起伏（4 个周期，循环无缝）
+		y += (rng.randf_range(-1.0, 1.0) - y) * 0.03
+		a[i] += y * (0.55 + 0.45 * sin(TAU * i / float(n) * 4.0 - 1.0)) * 0.9
+	var src := a.duplicate()
+	var d := int(e8 * 3.0 * _sr)
+	for i in n: a[(i + d) % n] += src[i] * 0.15
+	for i in 160:
+		a[i] *= i / 160.0
+		a[n - 1 - i] *= i / 160.0
+	return _wav(a, true)
+
+# 暗河赌厅：3/4 巴洛克圆舞曲（A 小调），羽管键琴琶音 + 大提琴长音 + 小提琴旋律；洞穴混响与滴水声
+const WZ_CH := {"Am": [64, 69, 72], "E7": [62, 68, 71], "Dm": [65, 69, 74], "C": [64, 67, 72], "G": [62, 67, 71], "F": [65, 69, 72]}
+const WZ_ROOT := {"Am": 45, "E7": 40, "Dm": 50, "C": 48, "G": 43, "F": 41}
+const WZ_BARS := ["Am", "Am", "E7", "E7", "Am", "Dm", "E7", "Am", "C", "G", "Dm", "Am", "F", "E7", "Dm", "E7"]
+const WZ_MEL := [
+	[[0, 81, 1.5], [1.5, 84, 0.5], [2, 83, 1]], [[0, 81, 1], [1, 76, 1], [2, 81, 1]], [[0, 80, 1.5], [1.5, 83, 0.5], [2, 86, 1]], [[0, 84, 1], [1, 83, 1], [2, 80, 1]],
+	[[0, 81, 1], [1, 84, 1], [2, 88, 1]], [[0, 86, 1.5], [1.5, 84, 0.5], [2, 81, 1]], [[0, 83, 1], [1, 80, 1], [2, 76, 1]], [[0, 81, 3]],
+	[[0, 84, 1.5], [1.5, 88, 0.5], [2, 84, 1]], [[0, 83, 1], [1, 86, 1], [2, 83, 1]], [[0, 81, 1], [1, 86, 1], [2, 89, 1]], [[0, 88, 1.5], [1.5, 84, 0.5], [2, 81, 1]],
+	[[0, 84, 1], [1, 81, 1], [2, 89, 1]], [[0, 88, 1], [1, 86, 1], [2, 83, 1]], [[0, 84, 1], [1, 81, 1], [2, 86, 1]], [[0, 83, 1.5], [1.5, 80, 0.5], [2, 81, 1]],
+]
+
+func _build_waltz() -> AudioStreamWAV:
+	var beat := 0.6
+	var bars := 16
+	var total := beat * 3.0 * bars
+	var a := _buf(total)
+	for b in bars:
+		var t0 := b * 3.0 * beat
+		var cn: String = WZ_BARS[b]
+		var notes: Array = WZ_CH[cn]
+		var root: int = WZ_ROOT[cn]
+		_reed(a, t0, beat * 2.9, _hz(root), 0.14, 0.003, 0.12, 0.4)
+		_harp(a, t0, beat * 0.9, _hz(root + 12), 0.18)
+		for bi in [1, 2]:
+			for k in 3: _harp(a, t0 + beat * bi + k * 0.035, beat * 0.9, _hz(notes[k]), 0.1 if bi == 1 else 0.07)
+		for m in WZ_MEL[b]: _reed(a, t0 + float(m[0]) * beat, float(m[2]) * beat * 0.95, _hz(float(m[1])), 0.11, 0.006, 0.04, 0.9)
+		_noise(a, t0, 0.04, 0.04, 70.0, 0.85)
+		for bi in [1, 2]: _noise(a, t0 + beat * bi, 0.02, 0.02, 90.0, 0.9)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 21
+	for k in 22: _tone(a, rng.randf() * (total - 0.4), 0.35, 1500.0 + rng.randf() * 1500.0, 1200.0, 0.05, 0, 0.002, 9.0)  # 滴水声
+	var n := a.size()
+	var src := a.duplicate()
+	for tap in [[0.29, 0.28], [0.57, 0.18], [0.9, 0.1]]:  # 洞穴混响
+		var d := int(float(tap[0]) * _sr)
+		for i in n: a[(i + d) % n] += src[i] * float(tap[1])
+	for i in 160:
+		a[i] *= i / 160.0
+		a[n - 1 - i] *= i / 160.0
+	return _wav(a, true)
