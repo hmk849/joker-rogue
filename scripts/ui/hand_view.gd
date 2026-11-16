@@ -58,6 +58,7 @@ func layout(animate: bool) -> void:
 	step = maxf(step, cw * 0.45)  # 极窄屏时牌会溢出两侧而不是彻底叠死
 	var x0 := (size.x - (step * (n - 1) + cw)) * 0.5
 	var mid := (n - 1) * 0.5
+	for i in n: move_child(views[i], i)  # 绘制层级 = 手牌顺序，否则排序/拖动后叠放顺序和点击判定会错位
 	for i in n:
 		var v: CardView = views[i]
 		if v == _drag: continue
