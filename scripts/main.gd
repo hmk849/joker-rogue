@@ -113,28 +113,40 @@ func _idle(b: Control) -> void:  # 小丑牌独立的待机摆动
 	t.tween_property(b, "rotation", deg_to_rad(-2.0), 2.4).set_trans(Tween.TRANS_SINE)
 	t.tween_property(b, "rotation", 0.0, 1.2).set_trans(Tween.TRANS_SINE)
 
-# ---------- 构建 ----------
+# ---------- 构建（仿原版《小丑牌》横屏布局）----------
+# 左栏：盲注 / 得分 / 牌型(筹码×倍率) / 出牌·弃牌 / 金币 / 底注·回合 / 选项
+# 右侧：顶部小丑牌区 + 消耗牌区，中间出牌区，下方 出牌·排序·弃牌 按钮，最下是手牌 + 牌堆
+var blind_panel: OrnatePanel
+
+func _box(bg: Color, accent: Color = Astral.GOLD_DIM, pad: float = 8.0) -> OrnatePanel:
+	var p := UIStyle.panel(bg, accent) as OrnatePanel
+	p.plain = true
+	p.set_pad(pad)
+	return p
+
+func _stat(title: String, key: String, col: Color) -> Control:  # 小标题 + 大数字的方框
+	var p := _box(Color(0, 0, 0, 0.35))
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 0)
+	p.add_child(v)
+	var t := UIStyle.label(title, 14, Astral.GOLD_DIM)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(t)
+	L[key] = UIStyle.label("", 30, col)
+	L[key].horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(L[key])
+	return p
+
 func _build() -> void:
 	var sp := UIManager.spacing()
 	var safe := SafeBox.new()
 	add_child(safe)
 	root_box = safe
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", sp)
-	safe.add_child(col)
-	var top := UIStyle.panel(Color(0.1, 0.13, 0.18, 0.95))
-	col.add_child(top)
-	var tr := HBoxContainer.new()
-	tr.add_theme_constant_override("separation", 48)
-	top.add_child(tr)
-	for k in ["ante", "hands", "discards"]:
-		L[k] = UIStyle.label("", 24)
-		tr.add_child(L[k])
 	var body := HBoxContainer.new()
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", sp)
-	col.add_child(body)
-	var parts := [_left(), _center(), _right()]
+	safe.add_child(body)
+	var parts := [_left(), _center()]
 	if bool(SettingsManager.get_value("layout_flipped")): parts.reverse()
 	for p in parts: body.add_child(p)
 	fx = Control.new()
@@ -143,112 +155,188 @@ func _build() -> void:
 	add_child(fx)
 
 func _left() -> Control:
-	var p := UIStyle.panel(Color(0.11, 0.14, 0.2, 0.96))
-	p.custom_minimum_size.x = 250
+	var col := UIStyle.panel(Color(0.08, 0.1, 0.2, 0.96))
+	col.custom_minimum_size.x = 290
+	(col as OrnatePanel).set_pad(12)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
-	p.add_child(v)
-	L["blind"] = UIStyle.label("", 30, Color(1, 0.8, 0.3))
-	L["target"] = UIStyle.label("", 40)
-	L["boss"] = UIStyle.label("", 16, Color(1, 0.55, 0.5))
+	col.add_child(v)
+	# 盲注框（颜色随小盲/大盲/Boss 变化）
+	blind_panel = _box(Astral.TEAL.darkened(0.5), Astral.TEAL, 12)
+	var bv := VBoxContainer.new()
+	bv.add_theme_constant_override("separation", 0)
+	blind_panel.add_child(bv)
+	L["blind"] = UIStyle.label("", 26, Astral.GOLD)
+	L["boss"] = UIStyle.label("", 14, Color(1, 0.75, 0.7))
 	L["boss"].autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
-	L["boss"].custom_minimum_size.x = 220
-	L["reward"] = UIStyle.label("", 20, Color(1, 0.85, 0.3))
-	L["score"] = UIStyle.label("0", 44, Astral.TEAL.lightened(0.35))
-	v.add_child(L["blind"])
-	v.add_child(L["boss"])
-	v.add_child(Astral.divider(210))
-	v.add_child(UIStyle.label("目标分数", 18, Astral.GOLD_DIM))
-	v.add_child(L["target"])
-	v.add_child(L["reward"])
-	v.add_child(UIStyle.label("本盲注得分", 18, Astral.GOLD_DIM))
-	v.add_child(L["score"])
-	var sp := Control.new()
-	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(sp)
-	var b1 := UIStyle.button("按点数排序", Color(0.25, 0.35, 0.55), 44)
-	var b2 := UIStyle.button("按花色排序", Color(0.25, 0.35, 0.55), 44)
-	var b3 := UIStyle.button("安全区调节", Color(0.3, 0.3, 0.38), 44)
-	var b4 := UIStyle.button("新游戏", Color(0.45, 0.25, 0.25), 44)
-	b1.pressed.connect(func(): _sort(1))
-	b2.pressed.connect(func(): _sort(2))
-	b3.pressed.connect(_open_safe)
-	b4.pressed.connect(_deck_select)
-	var b5 := UIStyle.button("设置", Color(0.3, 0.3, 0.38), 44)
-	b5.pressed.connect(_open_settings)
-	for b in [b1, b2, b5, b3, b4]: v.add_child(b)
-	return p
-
-func _right() -> Control:
-	var p := UIStyle.panel(Color(0.11, 0.14, 0.2, 0.96))
-	p.custom_minimum_size.x = 250
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 8)
-	p.add_child(v)
-	L["type"] = UIStyle.label("", 24, Color(1, 0.9, 0.5))
-	v.add_child(L["type"])
+	L["boss"].custom_minimum_size.x = 230
+	L["target"] = UIStyle.label("", 36)
+	L["reward"] = UIStyle.label("", 18, Astral.GOLD)
+	bv.add_child(L["blind"])
+	bv.add_child(L["boss"])
+	bv.add_child(UIStyle.label("得分至少", 14, Astral.GOLD_DIM))
+	bv.add_child(L["target"])
+	bv.add_child(L["reward"])
+	v.add_child(blind_panel)
+	# 本盲注得分
+	var sp1 := _box(Color(0, 0, 0, 0.4))
+	var sh := HBoxContainer.new()
+	sp1.add_child(sh)
+	var sl := UIStyle.label("本盲注\n得分", 14, Astral.GOLD_DIM)
+	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sh.add_child(sl)
+	L["score"] = UIStyle.label("0", 34, Astral.TEAL.lightened(0.35))
+	sh.add_child(L["score"])
+	v.add_child(sp1)
+	# 牌型 + 筹码 × 倍率
+	var tp := _box(Color(0, 0, 0, 0.4))
+	var tv := VBoxContainer.new()
+	tv.add_theme_constant_override("separation", 4)
+	tp.add_child(tv)
+	L["type"] = UIStyle.label("", 20, Astral.GOLD)
+	L["type"].horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	L["type"].custom_minimum_size.y = 26
+	tv.add_child(L["type"])
 	var hb := HBoxContainer.new()
 	hb.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_child(hb)
-	var cp := UIStyle.panel(Astral.TEAL.darkened(0.5), Astral.TEAL)
-	var mp := UIStyle.panel(Astral.CRIMSON.darkened(0.5), Astral.CRIMSON)
-	L["chips"] = UIStyle.label("0", 32)
-	L["mult"] = UIStyle.label("0", 32)
+	hb.add_theme_constant_override("separation", 6)
+	tv.add_child(hb)
+	var cp := _box(Astral.TEAL.darkened(0.5), Astral.TEAL, 6)
+	var mp := _box(Astral.CRIMSON.darkened(0.5), Astral.CRIMSON, 6)
+	cp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	L["chips"] = UIStyle.label("0", 30)
+	L["mult"] = UIStyle.label("0", 30)
+	for k in ["chips", "mult"]: L[k].horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cp.add_child(L["chips"])
 	mp.add_child(L["mult"])
 	hb.add_child(cp)
-	hb.add_child(UIStyle.label(" × ", 28))
+	hb.add_child(UIStyle.label("×", 24))
 	hb.add_child(mp)
-	L["money"] = UIStyle.label("", 34, Color(1, 0.85, 0.3))
-	v.add_child(L["money"])
-	v.add_child(UIStyle.label("小丑牌", 18, Astral.GOLD_DIM))
-	var g := GridContainer.new()
-	g.columns = 2
-	v.add_child(g)
-	L["jokers"] = g
-	v.add_child(UIStyle.label("消耗牌（点击使用）", 18, Astral.GOLD_DIM))
-	var g2 := GridContainer.new()
-	g2.columns = 2
-	v.add_child(g2)
-	L["cons"] = g2
-	var sp := Control.new()
-	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(sp)
-	L["deck"] = UIStyle.label("", 20, Astral.GOLD_DIM)
-	v.add_child(L["deck"])
+	v.add_child(tp)
+	# 出牌 / 弃牌
+	var r1 := HBoxContainer.new()
+	r1.add_theme_constant_override("separation", 8)
+	r1.add_child(_stat("出牌", "hands", Astral.TEAL.lightened(0.3)))
+	r1.add_child(_stat("弃牌", "discards", Astral.CRIMSON.lightened(0.25)))
+	v.add_child(r1)
+	# 金币
+	var mpn := _box(Color(0, 0, 0, 0.4))
+	L["money"] = UIStyle.label("", 32, Astral.GOLD)
+	L["money"].horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mpn.add_child(L["money"])
+	v.add_child(mpn)
+	# 底注 / 回合
+	var r2 := HBoxContainer.new()
+	r2.add_theme_constant_override("separation", 8)
+	r2.add_child(_stat("底注", "ante", Astral.IVORY))
+	r2.add_child(_stat("回合", "round", Astral.IVORY))
+	v.add_child(r2)
+	var sp2 := Control.new()
+	sp2.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(sp2)
+	var b1 := UIStyle.button("选项", Color(0.3, 0.3, 0.38), 40)
+	var b2 := UIStyle.button("新游戏", Color(0.45, 0.25, 0.25), 40)
+	b1.pressed.connect(_open_settings)
+	b2.pressed.connect(_deck_select)
+	v.add_child(b1)
+	v.add_child(b2)
+	return col
+
+func _slot_panel(title_key: String, key: String, min_w: float) -> Control:  # 小丑牌区 / 消耗牌区
+	var p := _box(Color(0.05, 0.07, 0.15, 0.8), Astral.GOLD_DIM, 10)
+	p.custom_minimum_size.x = min_w
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 2)
+	p.add_child(v)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 8)
+	h.custom_minimum_size.y = 76
+	L[key] = h
+	v.add_child(h)
+	L[title_key] = UIStyle.label("", 14, Astral.GOLD_DIM)
+	v.add_child(L[title_key])
 	return p
 
 func _center() -> Control:
 	var c := VBoxContainer.new()
 	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	c.add_theme_constant_override("separation", UIManager.spacing())
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", UIManager.spacing())
+	var jp := _slot_panel("jcount", "jokers", 0.0)
+	jp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(jp)
+	top.add_child(_slot_panel("ccount", "cons", 230.0))
+	c.add_child(top)
 	play_area = Control.new()
 	play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	play_area.custom_minimum_size.y = 150
+	play_area.custom_minimum_size.y = 120
 	play_area.draw.connect(func(): Astral.draw_sigil(play_area, play_area.size / 2.0, minf(play_area.size.x, play_area.size.y) * 0.48))
 	c.add_child(play_area)
-	hand_view = HandView.new()
-	hand_view.custom_minimum_size.y = CardView.H * cs + 56
-	hand_view.selection_changed.connect(_on_sel)
-	c.add_child(hand_view)
+	# 出牌 · 排序 · 弃牌
 	var bar := HBoxContainer.new()
 	bar.alignment = BoxContainer.ALIGNMENT_CENTER
-	bar.add_theme_constant_override("separation", 24)
+	bar.add_theme_constant_override("separation", 20)
 	c.add_child(bar)
-	play_btn = UIStyle.button("出牌", Color(0.15, 0.55, 0.3))
-	discard_btn = UIStyle.button("弃牌", Color(0.7, 0.25, 0.25))
+	play_btn = UIStyle.button("出牌", Color(0.2, 0.45, 0.85), 52)
+	discard_btn = UIStyle.button("弃牌", Color(0.85, 0.28, 0.28), 52)
+	play_btn.custom_minimum_size.x = 150
+	discard_btn.custom_minimum_size.x = 150
 	play_btn.pressed.connect(_do_play)
 	discard_btn.pressed.connect(_do_discard)
+	var sort_p := _box(Color(0.5, 0.3, 0.08, 0.85), Color(0.95, 0.6, 0.2), 6)
+	var sv := HBoxContainer.new()
+	sv.add_theme_constant_override("separation", 6)
+	sort_p.add_child(sv)
+	sv.add_child(UIStyle.label("排序", 18, Astral.GOLD))
+	var s1 := UIStyle.button("点数", Color(0.85, 0.5, 0.15), 40)
+	var s2 := UIStyle.button("花色", Color(0.85, 0.5, 0.15), 40)
+	s1.custom_minimum_size.x = 80
+	s2.custom_minimum_size.x = 80
+	s1.pressed.connect(func(): _sort(1))
+	s2.pressed.connect(func(): _sort(2))
+	sv.add_child(s1)
+	sv.add_child(s2)
 	bar.add_child(play_btn)
+	bar.add_child(sort_p)
 	bar.add_child(discard_btn)
+	# 手牌 + 右侧牌堆
+	var hr := HBoxContainer.new()
+	hr.add_theme_constant_override("separation", 8)
+	c.add_child(hr)
+	hand_view = HandView.new()
+	hand_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hand_view.custom_minimum_size.y = CardView.H * cs + 56
+	hand_view.selection_changed.connect(_on_sel)
+	hr.add_child(hand_view)
+	var dp := VBoxContainer.new()
+	dp.add_theme_constant_override("separation", 2)
+	var stack := Control.new()
+	stack.custom_minimum_size = Vector2(CardView.W * cs * 0.9 + 12.0, CardView.H * cs * 0.9 + 12.0)
+	for i in 3:
+		var cv := CardView.make({"rank": 2, "suit": 0, "enh": "", "ed": "", "seal": ""}, cs * 0.9)
+		cv.face_up = false
+		cv.position = Vector2(i * 3.0, 9.0 - i * 3.0)
+		stack.add_child(cv)
+	dp.add_child(stack)
+	L["deck"] = UIStyle.label("", 16, Astral.GOLD_DIM)
+	L["deck"].horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dp.add_child(L["deck"])
+	hr.add_child(dp)
 	return c
 
 # ---------- 刷新 ----------
 func _refresh() -> void:
 	var g := GameManager
-	L["ante"].text = "底注 %d / 8" % BlindManager.ante
-	L["hands"].text = "出牌 %d" % g.hands_left
-	L["discards"].text = "弃牌 %d" % g.discards_left
+	L["ante"].text = "%d / 8" % BlindManager.ante
+	L["round"].text = str((BlindManager.ante - 1) * 3 + BlindManager.index + 1)
+	L["hands"].text = str(g.hands_left)
+	L["discards"].text = str(g.discards_left)
+	var bc: Color = [Astral.TEAL, Color(0.9, 0.55, 0.2), Astral.CRIMSON][BlindManager.index]
+	blind_panel.bg = bc.darkened(0.5)
+	blind_panel.accent = bc
+	blind_panel.queue_redraw()
 	L["blind"].text = BlindManager.blind_name()
 	L["target"].text = str(BlindManager.target())
 	L["boss"].text = BlindManager.desc()
@@ -513,6 +601,8 @@ func _side() -> void:
 		var b := ItemView.make(ConsumableManager.owned[i], Vector2(100, 70))
 		b.pressed.connect(func(): _use_cons(i))
 		L["cons"].add_child(b)
+	L["jcount"].text = "小丑牌  %d/%d" % [JokerManager.owned.size(), GameManager.joker_slots]
+	L["ccount"].text = "消耗牌  %d/%d" % [ConsumableManager.owned.size(), GameManager.cons_slots]
 
 func _use_cons(i: int) -> void:
 	if busy: return
