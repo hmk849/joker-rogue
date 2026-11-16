@@ -21,13 +21,13 @@ func _ready() -> void:
 	cs = UIManager.card_scale()
 	_setup_fx()
 	_build()
-	move_child(root_box, 1)
-	move_child(fx, 2)
+	move_child(root_box, 2)
+	move_child(fx, 3)
 	GameManager.state_changed.connect(func():
 		if busy: pending = true
 		else: _refresh())
 	GameManager.blind_cleared.connect(func(r): banner = "盲注通过！ +$%d" % r)
-	if not GameManager.load_run(): _deck_select()
+	_show_title()
 
 # ---------- 特效层：Shader 背景 / 色彩与高对比后处理 / 设置联动 ----------
 var bg_mat: ShaderMaterial
@@ -44,6 +44,7 @@ func _setup_fx() -> void:
 	bg_mat.shader = FxShaders.shader("bg")
 	bg.material = bg_mat
 	add_child(bg)
+	add_child(BgDoodles.new())
 	post_layer = CanvasLayer.new()
 	post_layer.layer = 100
 	var pr := ColorRect.new()
@@ -91,8 +92,8 @@ func _rebuild_ui() -> void:
 		remove_child(n)
 		n.queue_free()
 	_build()
-	move_child(root_box, 1)
-	move_child(fx, 2)
+	move_child(root_box, 2)
+	move_child(fx, 3)
 	_refresh()
 
 func _open_settings() -> void:
@@ -165,7 +166,17 @@ func _left() -> Control:
 	blind_panel = _box(Astral.TEAL.darkened(0.5), Astral.TEAL, 12)
 	var bv := VBoxContainer.new()
 	bv.add_theme_constant_override("separation", 0)
-	blind_panel.add_child(bv)
+	bv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var hh := HBoxContainer.new()
+	hh.add_theme_constant_override("separation", 10)
+	blind_panel.add_child(hh)
+	var tok := Control.new()
+	tok.custom_minimum_size = Vector2(58, 58)
+	tok.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	tok.draw.connect(func(): _draw_token(tok))
+	L["token"] = tok
+	hh.add_child(tok)
+	hh.add_child(bv)
 	L["blind"] = UIStyle.label("", 26, Astral.GOLD)
 	L["boss"] = UIStyle.label("", 14, Color(1, 0.75, 0.7))
 	L["boss"].autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
@@ -236,9 +247,9 @@ func _left() -> Control:
 	sp2.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(sp2)
 	var b1 := UIStyle.button("选项", Color(0.3, 0.3, 0.38), 40)
-	var b2 := UIStyle.button("新游戏", Color(0.45, 0.25, 0.25), 40)
+	var b2 := UIStyle.button("主菜单", Color(0.45, 0.25, 0.25), 40)
 	b1.pressed.connect(_open_settings)
-	b2.pressed.connect(_deck_select)
+	b2.pressed.connect(_show_title)
 	v.add_child(b1)
 	v.add_child(b2)
 	return col
@@ -337,6 +348,7 @@ func _refresh() -> void:
 	blind_panel.bg = bc.darkened(0.5)
 	blind_panel.accent = bc
 	blind_panel.queue_redraw()
+	L["token"].queue_redraw()
 	L["blind"].text = BlindManager.blind_name()
 	L["target"].text = str(BlindManager.target())
 	L["boss"].text = BlindManager.desc()
@@ -601,6 +613,8 @@ func _side() -> void:
 		var b := ItemView.make(ConsumableManager.owned[i], Vector2(100, 70))
 		b.pressed.connect(func(): _use_cons(i))
 		L["cons"].add_child(b)
+	for k in maxi(0, GameManager.joker_slots - JokerManager.owned.size()): L["jokers"].add_child(_slot_ph())
+	for k in maxi(0, GameManager.cons_slots - ConsumableManager.owned.size()): L["cons"].add_child(_slot_ph())
 	L["jcount"].text = "小丑牌  %d/%d" % [JokerManager.owned.size(), GameManager.joker_slots]
 	L["ccount"].text = "消耗牌  %d/%d" % [ConsumableManager.owned.size(), GameManager.cons_slots]
 
@@ -668,3 +682,44 @@ func _deck_select() -> void:
 			GameManager.start_run(id))
 		g.add_child(b)
 	add_child(ov)
+
+# ---------- 开始界面 / 盲注徽章 / 空槽位 ----------
+func _show_title() -> void:
+	if get_node_or_null("Title"): return
+	var t := TitleScreen.new()
+	t.name = "Title"
+	t.has_save = SaveManager.has_run()
+	add_child(t)
+	var close := func():
+		remove_child(t)
+		t.queue_free()
+	t.continue_run.connect(func():
+		close.call()
+		if not GameManager.load_run(): _deck_select())
+	t.start_new.connect(func():
+		close.call()
+		_deck_select())
+	t.open_settings.connect(_open_settings)
+
+func _draw_token(t: Control) -> void:  # 盲注徽章：小盲/大盲笑脸，Boss 皱眉
+	var idx := BlindManager.index
+	var col: Color = [Astral.TEAL, Color(0.9, 0.55, 0.2), Astral.CRIMSON][idx]
+	var c := t.size / 2.0
+	t.draw_circle(c, 26.0, col.darkened(0.15))
+	Sketch.stroke(t, Sketch.circle(c, 26.0, 28), Astral.CHALK, 2.4, 5 + idx)
+	Sketch.stroke(t, Sketch.circle(c, 19.0, 24), Color(Astral.CHALK, 0.4), 1.2, 9)
+	t.draw_circle(c + Vector2(-8, -5), 3.0, Astral.INK)
+	t.draw_circle(c + Vector2(8, -5), 3.0, Astral.INK)
+	if idx == 2:
+		t.draw_line(c + Vector2(-13, -12), c + Vector2(-4, -8), Astral.INK, 2.5)
+		t.draw_line(c + Vector2(13, -12), c + Vector2(4, -8), Astral.INK, 2.5)
+		t.draw_arc(c + Vector2(0, 14), 8.0, PI * 1.15, PI * 1.85, 12, Astral.INK, 2.5)
+	else:
+		t.draw_arc(c + Vector2(0, 2), 9.0, 0.25, PI - 0.25, 12, Astral.INK, 2.5)
+
+func _slot_ph() -> Control:  # 空槽位的虚线轮廓（像原版）
+	var p := Control.new()
+	p.custom_minimum_size = Vector2(100, 70)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.draw.connect(func(): Sketch.stroke(p, Sketch.round_rect(Rect2(3, 3, 94, 64), 8.0), Color(Astral.CHALK, 0.22), 1.6, 17))
+	return p

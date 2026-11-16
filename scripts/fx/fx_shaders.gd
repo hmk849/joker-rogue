@@ -10,38 +10,37 @@ float vnoise(vec2 p) {
 	vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
 	return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
-float fbm(vec2 p) {
-	float v = 0.0; float a = 0.5;
-	for (int i = 0; i < 6; i++) { if (i >= detail + 1) break; v += a * vnoise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; }
-	return v;
+vec3 pal(float x) {
+	vec3 c0 = vec3(0.05, 0.06, 0.14); vec3 c1 = vec3(0.10, 0.16, 0.30); vec3 c2 = vec3(0.12, 0.30, 0.36);
+	vec3 c3 = vec3(0.30, 0.16, 0.34); vec3 c4 = vec3(0.42, 0.22, 0.20);
+	x = clamp(x, 0.0, 1.0) * 4.0;
+	if (x < 1.0) return mix(c0, c1, x);
+	if (x < 2.0) return mix(c1, c2, x - 1.0);
+	if (x < 3.0) return mix(c2, c3, x - 2.0);
+	return mix(c3, c4, x - 3.0);
 }
 void fragment() {
-	vec2 uv = (UV - 0.5) * vec2(1.78, 1.0);
-	float t = TIME * speed;
-	vec3 col = mix(vec3(0.07, 0.09, 0.17), vec3(0.1, 0.08, 0.16), UV.y);
-	float n = fbm(uv * 1.7 + vec2(t * 0.01, -t * 0.008));
-	float rim = smoothstep(0.0, 0.03, abs(n - 0.54));
-	col = mix(col, vec3(0.13, 0.32, 0.38), smoothstep(0.54, 0.6, n) * 0.5);
-	col -= (1.0 - rim) * 0.05;
-	float n2 = fbm(uv * 2.3 + 7.0 - vec2(t * 0.012, 0.0));
-	col = mix(col, vec3(0.36, 0.14, 0.24), smoothstep(0.58, 0.66, n2) * 0.4);
-	float n3 = fbm(uv * 3.1 + 15.0);
-	col = mix(col, vec3(0.4, 0.28, 0.1), smoothstep(0.64, 0.72, n3) * 0.3);
-	col += (hash(floor(FRAGCOORD.xy * 0.5)) - 0.5) * 0.04;
-	col += (vnoise(vec2(uv.x * 260.0, uv.y * 5.0)) - 0.5) * 0.035;
-	vec2 gp = (uv + 0.5) * vec2(36.0, 20.0);
+	vec2 uv = (UV - 0.5) * vec2(1.78, 1.0) * 2.0;
+	float t = TIME * speed * 0.35;
+	vec2 p = uv;
+	for (int i = 0; i < 6; i++) {
+		if (i >= detail + 2) break;
+		p += 0.55 * vec2(sin(p.y * 1.6 + t + float(i) * 1.3), cos(p.x * 1.4 - t * 0.8 + float(i)));
+	}
+	float v = 0.5 + 0.5 * sin(length(p) * 1.8 - t * 1.2 + atan(p.y, p.x));
+	v += (vnoise(p * 6.0) - 0.5) * 0.05;
+	float f = fract(v * 6.0);
+	float lv = floor(v * 6.0) / 6.0;
+	vec3 col = pal(lv + f * 0.12);
+	col = mix(col, vec3(0.93, 0.9, 0.78), smoothstep(0.05, 0.0, min(f, 1.0 - f)) * 0.16);
+	col += (hash(floor(FRAGCOORD.xy * 0.5)) - 0.5) * 0.035;
+	col += (vnoise(vec2(UV.x * 260.0, UV.y * 5.0)) - 0.5) * 0.03;
+	vec2 gp = (uv * 0.5 + 0.5) * vec2(36.0, 20.0);
 	float h = hash(floor(gp));
-	vec2 f = fract(gp) - 0.5;
-	float cross_m = step(0.92, h) * smoothstep(0.035, 0.0, min(abs(f.x), abs(f.y))) * step(max(abs(f.x), abs(f.y)), 0.2);
-	col += vec3(0.95, 0.9, 0.75) * cross_m * (0.6 + 0.4 * sin(t * 2.0 + h * 40.0)) * 0.7;
-	float r = length(uv);
-	float ang = atan(uv.y, uv.x);
-	float rr = r + (vnoise(vec2(ang * 3.0, 1.0)) - 0.5) * 0.02;
-	float ring = smoothstep(0.004, 0.0, abs(rr - 0.55)) + smoothstep(0.003, 0.0, abs(rr - 0.5)) * 0.5 + smoothstep(0.003, 0.0, abs(rr - 0.78)) * 0.4;
-	float a2 = fract((ang + t * 0.02) * 24.0 / 6.2832);
-	float tick = smoothstep(0.05, 0.0, min(a2, 1.0 - a2)) * step(0.55, r) * step(r, 0.585);
-	col += vec3(0.95, 0.9, 0.78) * (ring * 0.16 + tick * 0.18);
-	col *= 1.0 - 0.4 * dot(uv, uv);
+	vec2 fp = fract(gp) - 0.5;
+	float mark = step(0.93, h) * smoothstep(0.035, 0.0, min(abs(fp.x), abs(fp.y))) * step(max(abs(fp.x), abs(fp.y)), 0.2);
+	col += vec3(0.95, 0.9, 0.75) * mark * (0.6 + 0.4 * sin(t * 5.0 + h * 40.0)) * 0.7;
+	col *= 1.0 - 0.38 * dot(uv * 0.5, uv * 0.5);
 	COLOR = vec4(col, 1.0);
 }
 """

@@ -71,14 +71,12 @@ func _build() -> void:
 		h1.add_child(b)
 	var h2 := _row("你的小丑牌（点击出售）")
 	for i in JokerManager.owned.size():
-		var b := ItemView.make({"kind": "joker", "id": JokerManager.owned[i]["id"], "ed": JokerManager.owned[i]["ed"]}, Vector2(130, 90))
-		b.text += "\n出售 $%d" % JokerManager.sell_value(i)
+		var b := ItemView.make({"kind": "joker", "id": JokerManager.owned[i]["id"], "ed": JokerManager.owned[i]["ed"]}, Vector2(130, 96), -1, "出售 $%d" % JokerManager.sell_value(i))
 		b.pressed.connect(func(): _sell(0, i))
 		h2.add_child(b)
 	var h3 := _row("你的消耗牌（点击出售）")
 	for i in ConsumableManager.owned.size():
-		var b := ItemView.make(ConsumableManager.owned[i], Vector2(130, 90))
-		b.text += "\n出售 $%d" % ConsumableManager.sell_value(i)
+		var b := ItemView.make(ConsumableManager.owned[i], Vector2(130, 96), -1, "出售 $%d" % ConsumableManager.sell_value(i))
 		b.pressed.connect(func(): _sell(1, i))
 		h3.add_child(b)
 	var bar := HBoxContainer.new()

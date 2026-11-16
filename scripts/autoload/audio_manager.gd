@@ -1,6 +1,6 @@
 extends Node
 # 全部音效与背景音乐由代码合成（正弦/三角/方波 + 噪声 + 指数包络），不使用任何外部音频。
-const RATE := 22050
+var _sr := 22050
 const HAPTIC := {"select": 8, "play": 25, "discard": 15, "buy": 15, "win": 60, "lose": 60}
 var sfx := {}
 var pool: Array = []
@@ -55,32 +55,32 @@ func play(name: String, pitch: float = 1.0) -> void:
 func _hz(m: float) -> float: return 440.0 * pow(2.0, (m - 69.0) / 12.0)
 func _buf(sec: float) -> PackedFloat32Array:
 	var a := PackedFloat32Array()
-	a.resize(int(sec * RATE))
+	a.resize(int(sec * _sr))
 	return a
 
 func _tone(a: PackedFloat32Array, t0: float, dur: float, f0: float, f1: float, vol: float, wave: int = 0, atk: float = 0.004, decay: float = 6.0) -> void:
-	var n := int(dur * RATE)
-	var s0 := int(t0 * RATE)
+	var n := int(dur * _sr)
+	var s0 := int(t0 * _sr)
 	var ph := 0.0
-	var an := maxf(atk * RATE, 1.0)
+	var an := maxf(atk * _sr, 1.0)
 	for i in n:
 		var idx := s0 + i
 		if idx >= a.size(): break
-		ph += lerpf(f0, f1, float(i) / n) / RATE
+		ph += lerpf(f0, f1, float(i) / n) / _sr
 		var w := sin(TAU * ph)
 		if wave == 1: w = 4.0 * absf(fposmod(ph, 1.0) - 0.5) - 1.0
 		elif wave == 2: w = 0.6 if fposmod(ph, 1.0) < 0.5 else -0.6
-		a[idx] += w * minf(1.0, i / an) * exp(-decay * float(i) / RATE) * vol
+		a[idx] += w * minf(1.0, i / an) * exp(-decay * float(i) / _sr) * vol
 
 func _noise(a: PackedFloat32Array, t0: float, dur: float, vol: float, decay: float, coef: float) -> void:
-	var n := int(dur * RATE)
-	var s0 := int(t0 * RATE)
+	var n := int(dur * _sr)
+	var s0 := int(t0 * _sr)
 	var y := 0.0
 	for i in n:
 		var idx := s0 + i
 		if idx >= a.size(): break
 		y += (randf_range(-1.0, 1.0) - y) * coef  # 一阶低通
-		a[idx] += y * exp(-decay * float(i) / RATE) * vol
+		a[idx] += y * exp(-decay * float(i) / _sr) * vol
 
 func _wav(a: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
 	var peak := 0.001
@@ -91,7 +91,7 @@ func _wav(a: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
 	for i in a.size(): bytes.encode_s16(i * 2, int(clampf(a[i] * g, -1.0, 1.0) * 32000.0))
 	var w := AudioStreamWAV.new()
 	w.format = AudioStreamWAV.FORMAT_16_BITS
-	w.mix_rate = RATE
+	w.mix_rate = _sr
 	w.stereo = false
 	w.data = bytes
 	if loop:
@@ -161,25 +161,87 @@ func _build_sfx() -> void:
 	_tone(a, 0.9, 0.6, 110, 90, 0.3, 2, 0.02, 3)
 	sfx["lose"] = _wav(a)
 
-# ---------- 背景音乐：Am-F-C-G / Am-F-G-E，鼓点+低音+琶音+和弦垫 ----------
+# ---------- 背景音乐：Lo-fi 爵士（84 BPM 摇摆，16 小节 A/B 两段）----------
+# 电钢琴(FM)和弦 + 三角波低音 + 旋律 + 刷子鼓/踩镲 + 磁带回声 + 唱片底噪
+const SW := 0.14  # 摇摆：反拍延后 0.14 拍
+const CHORDS := {"Dm9": [65, 69, 72, 76], "G13": [59, 64, 65], "Cmaj9": [64, 67, 71, 74], "Am7": [64, 67, 72],
+	"D7b9": [66, 69, 72], "Fmaj7": [64, 69, 72], "Em7": [62, 67, 71], "A7": [67, 73, 76]}
+const ROOTS := {"Dm9": 38, "G13": 43, "Cmaj9": 36, "Am7": 45, "D7b9": 38, "Fmaj7": 41, "Em7": 40, "A7": 45}
+const BARS := [["Dm9", "Dm9"], ["G13", "G13"], ["Cmaj9", "Cmaj9"], ["Am7", "D7b9"], ["Dm9", "Dm9"], ["G13", "G13"], ["Cmaj9", "Cmaj9"], ["Fmaj7", "Fmaj7"],
+	["Fmaj7", "Fmaj7"], ["Em7", "A7"], ["Dm9", "Dm9"], ["G13", "G13"], ["Cmaj9", "Cmaj9"], ["Am7", "Am7"], ["Dm9", "G13"], ["Cmaj9", "Cmaj9"]]
+const MELODY := [  # 每小节：[拍位, midi, 时值(拍)]
+	[[0.0, 76, 1.0], [1.5, 74, 0.5], [2.0, 72, 1.0], [3.5, 69, 0.5]], [[0.0, 71, 1.5], [2.0, 72, 0.5], [2.5, 74, 1.5]],
+	[[0.0, 76, 2.0], [2.5, 79, 0.5], [3.0, 76, 1.0]], [[0.0, 74, 1.0], [1.0, 72, 1.0], [2.5, 69, 1.0]],
+	[[0.0, 81, 1.5], [2.0, 79, 0.5], [2.5, 77, 0.5], [3.0, 76, 1.0]], [[0.0, 74, 1.5], [2.0, 71, 1.0], [3.0, 74, 1.0]],
+	[[0.0, 72, 1.0], [1.5, 76, 0.5], [2.0, 79, 2.0]], [[0.0, 77, 1.5], [2.0, 76, 0.5], [2.5, 72, 1.5]],
+	[[0.5, 81, 0.5], [1.0, 79, 1.0], [2.5, 77, 0.5], [3.0, 76, 1.0]], [[0.0, 74, 1.0], [1.5, 71, 0.5], [2.0, 73, 1.0], [3.0, 76, 1.0]],
+	[[0.0, 74, 2.0], [2.5, 77, 0.5], [3.0, 81, 1.0]], [[0.0, 79, 1.5], [2.0, 76, 0.5], [2.5, 74, 1.5]],
+	[[0.0, 72, 1.0], [1.0, 76, 1.0], [2.0, 79, 1.0], [3.0, 83, 1.0]], [[0.0, 81, 2.0], [2.5, 79, 0.5], [3.0, 76, 1.0]],
+	[[0.0, 74, 1.0], [1.0, 77, 1.0], [2.0, 71, 1.0], [3.0, 74, 1.0]], [[0.0, 76, 3.0]],
+]
+
+func _sw(x: float) -> float: return x + SW if absf(x - floorf(x) - 0.5) < 0.01 else x
+
+func _ep(a: PackedFloat32Array, t0: float, dur: float, f: float, vol: float) -> void:  # FM 电钢琴
+	var n := int(dur * _sr)
+	var s0 := int(t0 * _sr)
+	var ph := 0.0
+	var mp := 0.0
+	for i in n:
+		var idx := s0 + i
+		if idx >= a.size(): break
+		var t := float(i) / _sr
+		ph += f / _sr
+		mp += f * 2.0 / _sr
+		var m := sin(TAU * mp) * 1.5 * exp(-5.0 * t)
+		var env := minf(1.0, t / 0.004) * exp(-1.8 * t) * minf(1.0, (dur - t) / 0.03)
+		a[idx] += sin(TAU * ph + m) * env * vol * (1.0 + 0.1 * sin(TAU * 4.5 * t))
+
+func _lead(a: PackedFloat32Array, t0: float, dur: float, f: float, vol: float) -> void:  # 带颤音的旋律
+	var n := int(dur * _sr)
+	var s0 := int(t0 * _sr)
+	var ph := 0.0
+	for i in n:
+		var idx := s0 + i
+		if idx >= a.size(): break
+		var t := float(i) / _sr
+		ph += f * (1.0 + 0.004 * sin(TAU * 5.2 * t) * minf(1.0, t * 3.0)) / _sr
+		var env := minf(1.0, t / 0.025) * exp(-1.1 * t) * minf(1.0, (dur - t) / 0.05)
+		a[idx] += (sin(TAU * ph) + 0.28 * sin(TAU * ph * 2.0) + 0.1 * sin(TAU * ph * 3.0)) * env * vol
+
 func _build_music() -> void:
-	var beat := 60.0 / 96.0
-	var bars := 8
-	var a := _buf(beat * 4.0 * bars)
-	var chords := [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62], [57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 56, 59]]
-	var roots := [45, 41, 36, 43, 45, 41, 43, 40]
-	for b in bars:
-		var t0 := b * beat * 4.0
-		var ch: Array = chords[b]
-		for n in ch: _tone(a, t0, beat * 4.0, _hz(n), _hz(n), 0.05, 0, 0.4, 0.5)
-		var r := _hz(roots[b])
-		_tone(a, t0, beat * 1.5, r, r, 0.22, 1, 0.01, 3.0)
-		_tone(a, t0 + beat * 2.0, beat * 1.5, r * (1.5 if b % 2 == 0 else 1.0), r * (1.5 if b % 2 == 0 else 1.0), 0.2, 1, 0.01, 3.0)
-		for i in 8:
-			var note: int = ch[(i * (1 + b % 2)) % 3] + 12 + (12 if i % 4 == 3 else 0)
-			_tone(a, t0 + i * beat * 0.5, beat * 0.5, _hz(note), _hz(note), 0.07, 1, 0.005, 9.0)
-		for i in 4: _noise(a, t0 + beat * (i + 0.5), 0.05, 0.06, 40.0, 0.6)
-		for i in [0, 2]: _tone(a, t0 + beat * i, 0.15, 110, 45, 0.28, 0, 0.002, 14.0)
+	_sr = 16000  # 此后只有本线程做合成（音效已在启动时生成完毕）
+	var beat := 60.0 / 84.0
+	var a := _buf(beat * 4.0 * 16.0)
+	for bar in 16:
+		var t0 := bar * 4.0 * beat
+		for h in 2:
+			var cn: String = BARS[bar][h]
+			var notes: Array = CHORDS[cn]
+			var root: int = ROOTS[cn]
+			var hb := h * 2.0
+			for nn in notes:
+				_ep(a, t0 + _sw(hb) * beat, beat * 1.3, _hz(nn), 0.085)
+				_ep(a, t0 + _sw(hb + 1.5) * beat, beat * 0.4, _hz(nn), 0.05)
+			_tone(a, t0 + hb * beat, beat * 0.95, _hz(root), _hz(root), 0.24, 1, 0.01, 3.0)
+			_tone(a, t0 + _sw(hb + 1.5) * beat, beat * 0.4, _hz(root + 7), _hz(root + 7), 0.18, 1, 0.01, 4.0)
+		for m in MELODY[bar]: _lead(a, t0 + _sw(float(m[0])) * beat, float(m[2]) * beat * 0.95, _hz(float(m[1])), 0.11)
+		for k in 8: _noise(a, t0 + _sw(k * 0.5) * beat, 0.03, 0.03 if k % 2 == 0 else 0.018, 90.0, 0.9)
+		_tone(a, t0, 0.14, 120, 48, 0.32, 0, 0.002, 16.0)
+		if bar % 2 == 0: _tone(a, t0 + _sw(2.5) * beat, 0.12, 110, 48, 0.24, 0, 0.002, 18.0)
+		for sb in [1.0, 3.0]:
+			_noise(a, t0 + sb * beat, 0.12, 0.07, 18.0, 0.5)
+			_tone(a, t0 + sb * beat, 0.08, 190, 150, 0.04, 0, 0.002, 30.0)
+	var n := a.size()
+	var src := a.duplicate()
+	var d := int(beat * 0.75 * _sr)  # 附点八分回声（循环，首尾无缝）
+	for i in n: a[(i + d) % n] += src[i] * 0.22
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	for k in int(n / float(_sr) * 14.0): a[rng.randi() % n] += rng.randf_range(-1.0, 1.0) * 0.02  # 唱片底噪
+	for i in 160:
+		a[i] *= i / 160.0
+		a[n - 1 - i] *= i / 160.0
 	call_deferred("_start_music", _wav(a, true))
 
 func _start_music(stream: AudioStreamWAV) -> void:
